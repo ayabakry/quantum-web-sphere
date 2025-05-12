@@ -5,6 +5,7 @@ import QuantumVisualizer from '@/components/home/QuantumVisualizer';
 import RecentUpdates from '@/components/home/RecentUpdates';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
+import { Video, FileText, Database } from 'lucide-react';
 
 const Index = () => {
   return (

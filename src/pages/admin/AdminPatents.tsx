@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import AdminLayout from './AdminLayout';
 import ContentTable from '@/components/admin/ContentTable';
@@ -11,6 +10,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Plus } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PatentData } from '@/components/patents/PatentCard';
+import { Trash } from 'lucide-react';
 
 // Mock data for patents
 const initialPatents: PatentData[] = [
