@@ -1,50 +1,58 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import AdminLayout from './AdminLayout';
 import ContentTable from '@/components/admin/ContentTable';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
-import { Plus } from 'lucide-react';
+import { Plus, Trash } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PatentData } from '@/components/patents/PatentCard';
-import { Trash } from 'lucide-react';
 
-// Mock data for patents
-const initialPatents: PatentData[] = [
-  {
-    id: '1',
-    title: 'Quantum Circuit Optimization Method',
-    abstract: 'A novel method for optimizing quantum circuits to reduce gate count and improve coherence time',
-    inventors: ['Alice Johnson', 'Robert Chen'],
-    filingDate: '2022-03-15',
-    publicationDate: '2023-09-22',
-    patentNumber: 'US10234567',
-    status: 'granted',
-  },
-  {
-    id: '2',
-    title: 'Error-Resistant Quantum Memory',
-    abstract: 'A system for storing quantum information with enhanced protection against decoherence',
-    inventors: ['Sarah Williams', 'James Lee'],
-    filingDate: '2022-05-10',
-    publicationDate: '2023-11-05',
-    patentNumber: 'US10345678',
-    status: 'pending',
-  },
-  {
-    id: '3',
-    title: 'Quantum Network Protocol',
-    abstract: 'Secure communication protocol utilizing entanglement for quantum networks',
-    inventors: ['Michael Brown', 'Lisa Chen'],
-    filingDate: '2021-11-28',
-    publicationDate: '2023-05-14',
-    patentNumber: 'US10456789',
-    status: 'granted',
-  },
-];
+// Mock data for patents - moved to localStorage for persistence
+const getInitialPatents = (): PatentData[] => {
+  const savedPatents = localStorage.getItem('adminPatents');
+  if (savedPatents) {
+    return JSON.parse(savedPatents);
+  }
+  
+  // Default initial patents if none in localStorage
+  return [
+    {
+      id: '1',
+      title: 'Quantum Circuit Optimization Method',
+      abstract: 'A novel method for optimizing quantum circuits to reduce gate count and improve coherence time',
+      inventors: ['Alice Johnson', 'Robert Chen'],
+      filingDate: '2022-03-15',
+      publicationDate: '2023-09-22',
+      patentNumber: 'US10234567',
+      status: 'granted',
+    },
+    {
+      id: '2',
+      title: 'Error-Resistant Quantum Memory',
+      abstract: 'A system for storing quantum information with enhanced protection against decoherence',
+      inventors: ['Sarah Williams', 'James Lee'],
+      filingDate: '2022-05-10',
+      publicationDate: '2023-11-05',
+      patentNumber: 'US10345678',
+      status: 'pending',
+    },
+    {
+      id: '3',
+      title: 'Quantum Network Protocol',
+      abstract: 'Secure communication protocol utilizing entanglement for quantum networks',
+      inventors: ['Michael Brown', 'Lisa Chen'],
+      filingDate: '2021-11-28',
+      publicationDate: '2023-05-14',
+      patentNumber: 'US10456789',
+      status: 'granted',
+    },
+  ];
+};
 
 const columns = [
   { key: 'title', label: 'Title' },
@@ -55,10 +63,15 @@ const columns = [
 
 const AdminPatents = () => {
   const { toast } = useToast();
-  const [patents, setPatents] = useState(initialPatents);
+  const [patents, setPatents] = useState<PatentData[]>(getInitialPatents);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState<Partial<PatentData>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  // Save patents to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('adminPatents', JSON.stringify(patents));
+  }, [patents]);
 
   const handleAddPatent = () => {
     setFormData({ status: 'pending', inventors: [''] });
@@ -69,14 +82,16 @@ const AdminPatents = () => {
   const handleEditPatent = (id: string) => {
     const patentToEdit = patents.find(p => p.id === id);
     if (patentToEdit) {
-      setFormData(patentToEdit);
+      setFormData({ ...patentToEdit });
       setEditingId(id);
       setIsDialogOpen(true);
     }
   };
 
   const handleDeletePatent = (id: string) => {
-    setPatents(patents.filter(p => p.id !== id));
+    const updatedPatents = patents.filter(p => p.id !== id);
+    setPatents(updatedPatents);
+    
     toast({
       title: "Patent deleted",
       description: "The patent has been removed successfully",
@@ -88,7 +103,11 @@ const AdminPatents = () => {
     
     if (editingId) {
       // Update existing patent
-      setPatents(patents.map(p => p.id === editingId ? { ...p, ...formData } as PatentData : p));
+      const updatedPatents = patents.map(p => 
+        p.id === editingId ? { ...p, ...formData } as PatentData : p
+      );
+      setPatents(updatedPatents);
+      
       toast({
         title: "Patent updated",
         description: "The patent has been updated successfully",

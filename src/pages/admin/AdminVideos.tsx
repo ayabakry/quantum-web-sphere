@@ -1,9 +1,9 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AdminLayout from './AdminLayout';
 import ContentTable from '@/components/admin/ContentTable';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,33 +11,41 @@ import { useToast } from '@/components/ui/use-toast';
 import { Plus } from 'lucide-react';
 import { VideoData } from '@/components/videos/VideoCard';
 
-// Mock data for videos
-const initialVideos: VideoData[] = [
-  {
-    id: 'https://www.youtube.com/watch?v=JhHMJCUmq28',
-    title: 'Quantum Computing Explained',
-    thumbnail: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=800&q=60',
-    channelName: 'Quantum Research Channel',
-    publishedAt: 'May 10, 2023',
-    description: 'An introduction to quantum computing concepts and their applications in solving complex problems.',
-  },
-  {
-    id: 'https://www.youtube.com/watch?v=S4xALqDU1Eo',
-    title: 'Introduction to Quantum Mechanics',
-    thumbnail: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=800&q=60',
-    channelName: 'Physics Explained',
-    publishedAt: 'June 22, 2023',
-    description: 'This video provides a comprehensive overview of quantum mechanics and its fundamental principles.',
-  },
-  {
-    id: 'https://www.youtube.com/watch?v=e8yvJqxHswc',
-    title: 'Quantum Algorithms: A Deep Dive',
-    thumbnail: 'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?auto=format&fit=crop&w=800&q=60',
-    channelName: 'Quantum Research Channel',
-    publishedAt: 'August 5, 2023',
-    description: 'Explore the most important quantum algorithms and how they provide computational advantages over classical algorithms.',
-  },
-];
+// Get initial videos from localStorage or use default data
+const getInitialVideos = (): VideoData[] => {
+  const savedVideos = localStorage.getItem('adminVideos');
+  if (savedVideos) {
+    return JSON.parse(savedVideos);
+  }
+  
+  // Default initial videos
+  return [
+    {
+      id: 'https://www.youtube.com/watch?v=JhHMJCUmq28',
+      title: 'Quantum Computing Explained',
+      thumbnail: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=800&q=60',
+      channelName: 'Quantum Research Channel',
+      publishedAt: 'May 10, 2023',
+      description: 'An introduction to quantum computing concepts and their applications in solving complex problems.',
+    },
+    {
+      id: 'https://www.youtube.com/watch?v=S4xALqDU1Eo',
+      title: 'Introduction to Quantum Mechanics',
+      thumbnail: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=800&q=60',
+      channelName: 'Physics Explained',
+      publishedAt: 'June 22, 2023',
+      description: 'This video provides a comprehensive overview of quantum mechanics and its fundamental principles.',
+    },
+    {
+      id: 'https://www.youtube.com/watch?v=e8yvJqxHswc',
+      title: 'Quantum Algorithms: A Deep Dive',
+      thumbnail: 'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?auto=format&fit=crop&w=800&q=60',
+      channelName: 'Quantum Research Channel',
+      publishedAt: 'August 5, 2023',
+      description: 'Explore the most important quantum algorithms and how they provide computational advantages over classical algorithms.',
+    },
+  ];
+};
 
 const columns = [
   { key: 'title', label: 'Title' },
@@ -47,10 +55,15 @@ const columns = [
 
 const AdminVideos = () => {
   const { toast } = useToast();
-  const [videos, setVideos] = useState(initialVideos);
+  const [videos, setVideos] = useState<VideoData[]>(getInitialVideos);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState<Partial<VideoData>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  // Save videos to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('adminVideos', JSON.stringify(videos));
+  }, [videos]);
 
   const handleAddVideo = () => {
     setFormData({});
@@ -61,14 +74,16 @@ const AdminVideos = () => {
   const handleEditVideo = (id: string) => {
     const videoToEdit = videos.find(v => v.id === id);
     if (videoToEdit) {
-      setFormData(videoToEdit);
+      setFormData({ ...videoToEdit });
       setEditingId(id);
       setIsDialogOpen(true);
     }
   };
 
   const handleDeleteVideo = (id: string) => {
-    setVideos(videos.filter(v => v.id !== id));
+    const updatedVideos = videos.filter(v => v.id !== id);
+    setVideos(updatedVideos);
+    
     toast({
       title: "Video deleted",
       description: "The video has been removed successfully",
@@ -80,7 +95,11 @@ const AdminVideos = () => {
     
     if (editingId) {
       // Update existing video
-      setVideos(videos.map(v => v.id === editingId ? { ...v, ...formData } as VideoData : v));
+      const updatedVideos = videos.map(v => 
+        v.id === editingId ? { ...v, ...formData } as VideoData : v
+      );
+      setVideos(updatedVideos);
+      
       toast({
         title: "Video updated",
         description: "The video has been updated successfully",
