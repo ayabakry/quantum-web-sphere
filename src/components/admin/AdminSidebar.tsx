@@ -11,6 +11,7 @@ import {
   Settings,
   LayoutDashboard,
 } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 
 const navItems = [
   {
@@ -41,11 +42,16 @@ const navItems = [
 ];
 
 const AdminSidebar: React.FC = () => {
+  const { user } = useAuth();
+  
   return (
     <div className="min-h-screen border-r bg-sidebar w-64 flex flex-col">
       <div className="p-4 border-b">
         <Logo size="sm" />
         <div className="mt-2 text-xs text-sidebar-foreground/70">Admin Dashboard</div>
+        {user && (
+          <div className="mt-1 text-xs font-medium">Logged in as: {user.username}</div>
+        )}
       </div>
       <div className="flex-1 py-4">
         <nav className="px-2 space-y-1">

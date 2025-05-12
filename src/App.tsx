@@ -4,11 +4,16 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "./context/AuthContext";
+import ProtectedRoute from "./components/admin/ProtectedRoute";
+
 import Index from "./pages/Index";
 import Videos from "./pages/Videos";
 import Tutorials from "./pages/Tutorials";
 import Patents from "./pages/Patents";
 import Contact from "./pages/Contact";
+import Login from "./pages/Login";
+
 import Dashboard from "./pages/admin/Dashboard";
 import AdminVideos from "./pages/admin/AdminVideos";
 import AdminTutorials from "./pages/admin/AdminTutorials";
@@ -21,27 +26,50 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
       <BrowserRouter>
-        <Routes>
-          {/* Main Routes */}
-          <Route path="/" element={<Index />} />
-          <Route path="/videos" element={<Videos />} />
-          <Route path="/tutorials" element={<Tutorials />} />
-          <Route path="/patents" element={<Patents />} />
-          <Route path="/contact" element={<Contact />} />
-          
-          {/* Admin Routes */}
-          <Route path="/admin" element={<Dashboard />} />
-          <Route path="/admin/videos" element={<AdminVideos />} />
-          <Route path="/admin/tutorials" element={<AdminTutorials />} />
-          <Route path="/admin/patents" element={<AdminPatents />} />
-          <Route path="/admin/settings" element={<AdminSettings />} />
-          
-          {/* 404 Route */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AuthProvider>
+          <Toaster />
+          <Sonner />
+          <Routes>
+            {/* Main Routes */}
+            <Route path="/" element={<Index />} />
+            <Route path="/videos" element={<Videos />} />
+            <Route path="/tutorials" element={<Tutorials />} />
+            <Route path="/patents" element={<Patents />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/login" element={<Login />} />
+            
+            {/* Protected Admin Routes */}
+            <Route path="/admin" element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/videos" element={
+              <ProtectedRoute>
+                <AdminVideos />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/tutorials" element={
+              <ProtectedRoute>
+                <AdminTutorials />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/patents" element={
+              <ProtectedRoute>
+                <AdminPatents />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/settings" element={
+              <ProtectedRoute>
+                <AdminSettings />
+              </ProtectedRoute>
+            } />
+            
+            {/* 404 Route */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

@@ -6,6 +6,8 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { NavigationMenu, NavigationMenuItem, NavigationMenuLink, NavigationMenuList } from '@/components/ui/navigation-menu';
+import { useAuth } from '@/context/AuthContext';
+import { LogIn, LogOut, User } from 'lucide-react';
 
 const navigationLinks = [
   { name: 'Home', path: '/' },
@@ -17,15 +19,7 @@ const navigationLinks = [
 
 const Navbar: React.FC = () => {
   const { toast } = useToast();
-  const [isAdmin, setIsAdmin] = React.useState(false);
-
-  const handleAdminLogin = () => {
-    setIsAdmin(true);
-    toast({
-      title: "Admin mode activated",
-      description: "You can now access the admin dashboard",
-    });
-  };
+  const { user, logout, isAdmin } = useAuth();
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -53,13 +47,30 @@ const Navbar: React.FC = () => {
         </NavigationMenu>
         
         <div className="flex items-center gap-2">
-          {isAdmin ? (
-            <Button variant="outline" asChild>
-              <Link to="/admin">Admin Dashboard</Link>
-            </Button>
+          {user ? (
+            <>
+              <div className="text-sm mr-2">
+                Welcome, <span className="font-medium">{user.username}</span>
+              </div>
+              {isAdmin && (
+                <Button variant="outline" asChild className="mr-2">
+                  <Link to="/admin">
+                    <User className="mr-2 h-4 w-4" />
+                    Admin Dashboard
+                  </Link>
+                </Button>
+              )}
+              <Button variant="outline" onClick={logout}>
+                <LogOut className="mr-2 h-4 w-4" />
+                Logout
+              </Button>
+            </>
           ) : (
-            <Button variant="outline" onClick={handleAdminLogin}>
-              Admin Login
+            <Button variant="outline" asChild>
+              <Link to="/login">
+                <LogIn className="mr-2 h-4 w-4" />
+                Login
+              </Link>
             </Button>
           )}
         </div>
