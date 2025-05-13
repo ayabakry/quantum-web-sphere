@@ -1,8 +1,9 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useSharedData } from '@/context/SharedDataContext';
 
-type Update = {
+export type Update = {
   id: number;
   title: string;
   description: string;
@@ -10,31 +11,46 @@ type Update = {
   type: 'video' | 'tutorial' | 'patent';
 };
 
-const recentUpdates: Update[] = [
-  {
-    id: 1,
-    title: 'Quantum Computing Basics',
-    description: 'New introductory video on quantum computing fundamentals',
-    date: '2 days ago',
-    type: 'video',
-  },
-  {
-    id: 2,
-    title: 'Quantum Algorithms PDF',
-    description: 'Tutorial on implementing Shor\'s algorithm',
-    date: '1 week ago',
-    type: 'tutorial',
-  },
-  {
-    id: 3,
-    title: 'Quantum Error Correction',
-    description: 'New patent filed for error correction in quantum circuits',
-    date: '2 weeks ago',
-    type: 'patent',
-  },
-];
-
 const RecentUpdates: React.FC = () => {
+  const { recentUpdates } = useSharedData();
+  const [updates, setUpdates] = useState<Update[]>([]);
+
+  useEffect(() => {
+    if (recentUpdates.length > 0) {
+      setUpdates(recentUpdates);
+    } else {
+      const savedUpdates = localStorage.getItem('recentUpdates');
+      if (savedUpdates) {
+        setUpdates(JSON.parse(savedUpdates));
+      } else {
+        // Fallback to default data if nothing in context or localStorage
+        setUpdates([
+          {
+            id: 1,
+            title: 'Quantum Computing Basics',
+            description: 'New introductory video on quantum computing fundamentals',
+            date: '2 days ago',
+            type: 'video',
+          },
+          {
+            id: 2,
+            title: 'Quantum Algorithms PDF',
+            description: 'Tutorial on implementing Shor\'s algorithm',
+            date: '1 week ago',
+            type: 'tutorial',
+          },
+          {
+            id: 3,
+            title: 'Quantum Error Correction',
+            description: 'New patent filed for error correction in quantum circuits',
+            date: '2 weeks ago',
+            type: 'patent',
+          },
+        ]);
+      }
+    }
+  }, [recentUpdates]);
+
   return (
     <Card className="w-full h-full">
       <CardHeader>
@@ -43,7 +59,7 @@ const RecentUpdates: React.FC = () => {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {recentUpdates.map((update) => (
+          {updates.map((update) => (
             <div key={update.id} className="flex items-start space-x-4 pb-4 border-b last:border-0">
               <div className="w-full">
                 <div className="flex justify-between">
