@@ -12,6 +12,14 @@ interface ContentTableProps {
 }
 
 const ContentTable: React.FC<ContentTableProps> = ({ columns, data, onEdit, onDelete }) => {
+  const handleDelete = (id: string, event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    // Call the onDelete function with the id
+    onDelete(id);
+  };
+
   return (
     <div className="rounded-md border">
       <Table>
@@ -54,11 +62,7 @@ const ContentTable: React.FC<ContentTableProps> = ({ columns, data, onEdit, onDe
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        onDelete(row.id);
-                      }}
+                      onClick={(e) => handleDelete(row.id, e)}
                     >
                       <Trash className="h-4 w-4" />
                     </Button>

@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { VideoData } from '@/components/videos/VideoCard';
 import { DocumentData } from '@/components/tutorials/DocumentCard';
@@ -58,22 +57,22 @@ export const SharedDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   // Save to localStorage whenever data changes
   useEffect(() => {
-    if (videos.length > 0) {
-      localStorage.setItem('adminVideos', JSON.stringify(videos));
-    }
+    localStorage.setItem('adminVideos', JSON.stringify(videos));
   }, [videos]);
 
   useEffect(() => {
-    if (documents.length > 0) {
-      localStorage.setItem('adminDocuments', JSON.stringify(documents));
-    }
+    localStorage.setItem('adminDocuments', JSON.stringify(documents));
   }, [documents]);
 
   useEffect(() => {
-    if (patents.length > 0) {
-      localStorage.setItem('adminPatents', JSON.stringify(patents));
-    }
+    localStorage.setItem('adminPatents', JSON.stringify(patents));
   }, [patents]);
+
+  useEffect(() => {
+    if (recentUpdates.length > 0) {
+      localStorage.setItem('recentUpdates', JSON.stringify(recentUpdates));
+    }
+  }, [recentUpdates]);
 
   // Function to update recent updates based on latest content
   const updateRecentUpdates = () => {
@@ -140,7 +139,6 @@ export const SharedDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   // Helper to parse relative date for sorting
   const parseRelativeDate = (relativeDate: string): number => {
-    // Convert relative date strings to approximate timestamps for sorting
     const now = new Date().getTime();
     
     if (relativeDate.includes('minutes')) {
