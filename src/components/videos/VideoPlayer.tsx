@@ -26,12 +26,24 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
 
   // Extract YouTube video ID from URL
   const getVideoId = (url: string) => {
-    // This is a simplified version, in reality you would use a more robust method
-    if (url.includes('youtu.be/')) {
-      return url.split('youtu.be/')[1];
-    } else if (url.includes('youtube.com/watch?v=')) {
-      return url.split('v=')[1].split('&')[0];
+    try {
+      const urlObj = new URL(url);
+      
+      if (urlObj.hostname === 'youtu.be') {
+        return urlObj.pathname.substring(1);
+      } else if (urlObj.hostname.includes('youtube.com')) {
+        const searchParams = new URLSearchParams(urlObj.search);
+        return searchParams.get('v');
+      }
+    } catch (error) {
+      // If URL parsing fails, try simple string extraction
+      if (url.includes('youtu.be/')) {
+        return url.split('youtu.be/')[1].split('?')[0];
+      } else if (url.includes('youtube.com/watch?v=')) {
+        return url.split('v=')[1].split('&')[0];
+      }
     }
+    
     return url; // Assume it's already an ID
   };
 

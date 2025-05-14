@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import AdminLayout from './AdminLayout';
 import ContentTable from '@/components/admin/ContentTable';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Plus } from 'lucide-react';
 import { VideoData } from '@/components/videos/VideoCard';
 import { useSharedData } from '@/context/SharedDataContext';
+import { getYoutubeThumbnail } from '@/lib/utils';
 
 const columns = [
   { key: 'title', label: 'Title' },
@@ -54,10 +55,26 @@ const AdminVideos = () => {
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!formData.id) {
+      toast({
+        title: "Error",
+        description: "Please enter a YouTube URL",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Automatically generate thumbnail from YouTube URL
+    const thumbnail = getYoutubeThumbnail(formData.id);
+    
     if (editingId) {
       // Update existing video
       const updatedVideos = videos.map(v => 
-        v.id === editingId ? { ...v, ...formData } as VideoData : v
+        v.id === editingId ? { 
+          ...v, 
+          ...formData,
+          thumbnail 
+        } as VideoData : v
       );
       setVideos(updatedVideos);
       updateRecentUpdates();
@@ -70,7 +87,8 @@ const AdminVideos = () => {
       // Add new video
       const newVideo = {
         ...formData,
-        id: formData.id || `https://www.youtube.com/watch?v=${Date.now()}`,
+        id: formData.id,
+        thumbnail,
         publishedAt: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
       } as VideoData;
       
@@ -141,6 +159,9 @@ const AdminVideos = () => {
                 placeholder="https://www.youtube.com/watch?v=..."
                 required
               />
+              <p className="text-xs text-muted-foreground">
+                Thumbnails will be automatically generated from this YouTube URL
+              </p>
             </div>
             
             <div className="space-y-2">
@@ -150,18 +171,6 @@ const AdminVideos = () => {
                 name="channelName"
                 value={formData.channelName || ''}
                 onChange={handleInputChange}
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="thumbnail">Thumbnail URL</Label>
-              <Input
-                id="thumbnail"
-                name="thumbnail"
-                value={formData.thumbnail || ''}
-                onChange={handleInputChange}
-                placeholder="https://example.com/thumbnail.jpg"
                 required
               />
             </div>
