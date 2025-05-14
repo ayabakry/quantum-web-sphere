@@ -34,36 +34,9 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Quantum Data Visualization */}
-      <section className="py-12 md:py-16">
-        <div className="container px-4 md:px-6">
-          <div className="flex flex-col items-center justify-center space-y-4 text-center mb-8">
-            <h2 className="text-3xl font-bold tracking-tight">Quantum Data Visualization</h2>
-            <p className="max-w-[700px] text-muted-foreground">
-              Interactive visualization of quantum states and computational results
-            </p>
-          </div>
-          <div className="mx-auto max-w-4xl">
-            <QuantumVisualizer />
-          </div>
-        </div>
-      </section>
+     
 
-      {/* Recent Updates */}
-      <section className="py-12 md:py-16 bg-muted/50">
-        <div className="container px-4 md:px-6">
-          <div className="flex flex-col items-center justify-center space-y-4 text-center mb-8">
-            <h2 className="text-3xl font-bold tracking-tight">Latest Updates</h2>
-            <p className="max-w-[700px] text-muted-foreground">
-              Stay up to date with the latest quantum research content
-            </p>
-          </div>
-          <div className="mx-auto max-w-4xl">
-            <RecentUpdates />
-          </div>
-        </div>
-      </section>
-
+    
       {/* Features */}
       <section className="py-12 md:py-16">
         <div className="container px-4 md:px-6">

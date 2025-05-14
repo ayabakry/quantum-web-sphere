@@ -1,6 +1,7 @@
-
+import { Image as ImageIcon } from 'lucide-react';
 import React from 'react';
 import { Link } from 'react-router-dom';
+import logoo from './logo.png'; 
 
 interface LogoProps {
   size?: 'sm' | 'md' | 'lg';
@@ -17,9 +18,11 @@ const Logo: React.FC<LogoProps> = ({ size = 'md' }) => {
     <Link to="/" className="flex items-center gap-2">
       <div className="relative">
         <div className={`font-bold ${sizeClasses[size]} text-quantum-purple flex items-center`}>
-          <span>Q</span>
-          <div className="animate-quantum-pulse w-6 h-6 rounded-full bg-quantum-purple/20 absolute -right-1 -top-1" />
-          <span>RAM</span>
+          {logoo ? (
+            <img src={logoo} alt="logo" className="h-40"/>
+          ) : (
+            <ImageIcon className="h-8 w-8" />
+          )}
         </div>
       </div>
     </Link>
