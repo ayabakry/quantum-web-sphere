@@ -6,7 +6,7 @@ import { getYoutubeThumbnail } from '@/lib/utils';
 export interface VideoData {
   id: string;
   title: string;
-  thumbnail: string;
+  thumbnail?: string;
   channelName: string;
   publishedAt: string;
   description: string;

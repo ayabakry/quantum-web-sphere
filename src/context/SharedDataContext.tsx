@@ -3,6 +3,7 @@ import { VideoData } from '@/components/videos/VideoCard';
 import { DocumentData } from '@/components/tutorials/DocumentCard';
 import { PatentData } from '@/components/patents/PatentCard';
 import { Update } from '@/components/home/RecentUpdates';
+import { syncData, loadData } from '@/lib/utils';
 
 interface SharedDataContextType {
   videos: VideoData[];
@@ -26,53 +27,83 @@ export const useSharedData = () => {
 };
 
 export const SharedDataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [videos, setVideos] = useState<VideoData[]>([]);
-  const [documents, setDocuments] = useState<DocumentData[]>([]);
-  const [patents, setPatents] = useState<PatentData[]>([]);
+  const [videos, setVideosState] = useState<VideoData[]>([]);
+  const [documents, setDocumentsState] = useState<DocumentData[]>([]);
+  const [patents, setPatentsState] = useState<PatentData[]>([]);
   const [recentUpdates, setRecentUpdates] = useState<Update[]>([]);
 
   // Load data from localStorage on initial load
   useEffect(() => {
     // Load videos
-    const savedVideos = localStorage.getItem('adminVideos');
-    if (savedVideos) {
-      setVideos(JSON.parse(savedVideos));
-    }
-
+    setVideosState(loadData('adminVideos', []));
+    
     // Load documents
-    const savedDocuments = localStorage.getItem('adminDocuments');
-    if (savedDocuments) {
-      setDocuments(JSON.parse(savedDocuments));
-    }
-
+    setDocumentsState(loadData('adminDocuments', []));
+    
     // Load patents
-    const savedPatents = localStorage.getItem('adminPatents');
-    if (savedPatents) {
-      setPatents(JSON.parse(savedPatents));
+    setPatentsState(loadData('adminPatents', []));
+    
+    // Load recent updates or generate them
+    const savedUpdates = loadData('recentUpdates', []);
+    if (savedUpdates.length > 0) {
+      setRecentUpdates(savedUpdates);
+    } else {
+      updateRecentUpdates();
     }
 
-    // Initial creation of recent updates
-    updateRecentUpdates();
+    // Listen for storage events from other tabs/windows
+    const handleStorageEvent = (event: StorageEvent | CustomEvent) => {
+      if (event instanceof StorageEvent) {
+        if (event.key === 'adminVideos') {
+          const newVideos = loadData('adminVideos', []);
+          setVideosState(newVideos);
+        } else if (event.key === 'adminDocuments') {
+          const newDocuments = loadData('adminDocuments', []);
+          setDocumentsState(newDocuments);
+        } else if (event.key === 'adminPatents') {
+          const newPatents = loadData('adminPatents', []);
+          setPatentsState(newPatents);
+        } else if (event.key === 'recentUpdates') {
+          const newUpdates = loadData('recentUpdates', []);
+          setRecentUpdates(newUpdates);
+        }
+      } else if (event instanceof CustomEvent && event.type === 'lovableStorage') {
+        const { key, data } = event.detail;
+        if (key === 'adminVideos') {
+          setVideosState(data);
+        } else if (key === 'adminDocuments') {
+          setDocumentsState(data);
+        } else if (key === 'adminPatents') {
+          setPatentsState(data);
+        } else if (key === 'recentUpdates') {
+          setRecentUpdates(data);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageEvent);
+    window.addEventListener('lovableStorage', handleStorageEvent as EventListener);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageEvent);
+      window.removeEventListener('lovableStorage', handleStorageEvent as EventListener);
+    };
   }, []);
 
-  // Save to localStorage whenever data changes
-  useEffect(() => {
-    localStorage.setItem('adminVideos', JSON.stringify(videos));
-  }, [videos]);
+  const setVideos = (newVideos: VideoData[]) => {
+    setVideosState(newVideos);
+    syncData('adminVideos', newVideos);
+  };
 
-  useEffect(() => {
-    localStorage.setItem('adminDocuments', JSON.stringify(documents));
-  }, [documents]);
+  const setDocuments = (newDocuments: DocumentData[]) => {
+    setDocumentsState(newDocuments);
+    syncData('adminDocuments', newDocuments);
+  };
 
-  useEffect(() => {
-    localStorage.setItem('adminPatents', JSON.stringify(patents));
-  }, [patents]);
-
-  useEffect(() => {
-    if (recentUpdates.length > 0) {
-      localStorage.setItem('recentUpdates', JSON.stringify(recentUpdates));
-    }
-  }, [recentUpdates]);
+  const setPatents = (newPatents: PatentData[]) => {
+    setPatentsState(newPatents);
+    syncData('adminPatents', newPatents);
+  };
 
   // Function to update recent updates based on latest content
   const updateRecentUpdates = () => {
@@ -109,8 +140,9 @@ export const SharedDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     });
 
     // Take the most recent 3 updates
-    setRecentUpdates(allUpdates.slice(0, 3));
-    localStorage.setItem('recentUpdates', JSON.stringify(allUpdates.slice(0, 3)));
+    const latestUpdates = allUpdates.slice(0, 3);
+    setRecentUpdates(latestUpdates);
+    syncData('recentUpdates', latestUpdates);
   };
 
   // Helper to convert date to relative time
