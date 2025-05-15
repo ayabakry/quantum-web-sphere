@@ -6,22 +6,17 @@ import { useSharedData } from '@/context/SharedDataContext';
 import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const Patents = () => {
-  const { patents } = useSharedData();
+  const { patents, loading } = useSharedData();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [displayPatents, setDisplayPatents] = useState<PatentData[]>([]);
 
   useEffect(() => {
-    // Use patents from context, or fall back to localStorage if empty
     if (patents.length > 0) {
       setDisplayPatents(patents);
-    } else {
-      const savedPatents = localStorage.getItem('adminPatents');
-      if (savedPatents) {
-        setDisplayPatents(JSON.parse(savedPatents));
-      }
     }
   }, [patents]);
 
@@ -36,6 +31,15 @@ const Patents = () => {
     
     return matchesSearch && matchesStatus;
   });
+
+  // Loading skeleton component
+  const LoadingSkeleton = () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <Skeleton className="h-[300px] w-full" />
+      <Skeleton className="h-[300px] w-full" />
+      <Skeleton className="h-[300px] w-full" />
+    </div>
+  );
 
   return (
     <MainLayout>
@@ -71,7 +75,9 @@ const Patents = () => {
           </div>
         </div>
         
-        {filteredPatents.length === 0 ? (
+        {loading ? (
+          <LoadingSkeleton />
+        ) : filteredPatents.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-muted-foreground">No patents found</p>
           </div>

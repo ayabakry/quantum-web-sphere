@@ -5,21 +5,16 @@ import DocumentCard, { DocumentData } from '@/components/tutorials/DocumentCard'
 import { useSharedData } from '@/context/SharedDataContext';
 import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const Tutorials = () => {
-  const { documents } = useSharedData();
+  const { documents, loading } = useSharedData();
   const [searchQuery, setSearchQuery] = useState('');
   const [displayDocuments, setDisplayDocuments] = useState<DocumentData[]>([]);
 
   useEffect(() => {
-    // Use documents from context, or fall back to localStorage if empty
     if (documents.length > 0) {
       setDisplayDocuments(documents);
-    } else {
-      const savedDocuments = localStorage.getItem('adminDocuments');
-      if (savedDocuments) {
-        setDisplayDocuments(JSON.parse(savedDocuments));
-      }
     }
   }, [documents]);
 
@@ -31,6 +26,15 @@ const Tutorials = () => {
   // Filter documents by type
   const pdfDocuments = filteredDocuments.filter(doc => doc.fileType === 'pdf');
   const pptDocuments = filteredDocuments.filter(doc => doc.fileType === 'ppt');
+
+  // Loading skeleton component
+  const LoadingSkeleton = () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <Skeleton className="h-[200px] w-full" />
+      <Skeleton className="h-[200px] w-full" />
+      <Skeleton className="h-[200px] w-full" />
+    </div>
+  );
 
   return (
     <MainLayout>
@@ -47,7 +51,9 @@ const Tutorials = () => {
           />
         </div>
         
-        {filteredDocuments.length === 0 ? (
+        {loading ? (
+          <LoadingSkeleton />
+        ) : filteredDocuments.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-muted-foreground">No documents found</p>
           </div>

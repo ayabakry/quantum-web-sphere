@@ -6,28 +6,37 @@ import VideoPlayer from '@/components/videos/VideoPlayer';
 import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
 import { useSharedData } from '@/context/SharedDataContext';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const Videos = () => {
-  const { videos } = useSharedData();
+  const { videos, loading } = useSharedData();
   const [selectedVideo, setSelectedVideo] = useState<VideoData | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [displayVideos, setDisplayVideos] = useState<VideoData[]>([]);
 
   useEffect(() => {
-    // Use videos from context, or fall back to localStorage if empty
     if (videos.length > 0) {
       setDisplayVideos(videos);
-    } else {
-      const savedVideos = localStorage.getItem('adminVideos');
-      if (savedVideos) {
-        setDisplayVideos(JSON.parse(savedVideos));
+      
+      // If we have videos and none selected yet, select the first one
+      if (!selectedVideo && videos.length > 0) {
+        setSelectedVideo(videos[0]);
       }
     }
-  }, [videos]);
+  }, [videos, selectedVideo]);
 
   const filteredVideos = displayVideos.filter(video => 
     video.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     video.channelName.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Loading skeleton component
+  const LoadingSkeleton = () => (
+    <div className="space-y-4">
+      <Skeleton className="h-[200px] w-full" />
+      <Skeleton className="h-[200px] w-full" />
+      <Skeleton className="h-[200px] w-full" />
+    </div>
   );
 
   return (
@@ -53,15 +62,21 @@ const Videos = () => {
           <div className="lg:col-span-1 space-y-4">
             <h2 className="text-lg font-medium">Video List</h2>
             <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
-              {filteredVideos.map((video) => (
-                <VideoCard 
-                  key={video.id} 
-                  video={video} 
-                  onSelect={setSelectedVideo} 
-                />
-              ))}
-              {filteredVideos.length === 0 && (
-                <p className="text-center text-muted-foreground py-8">No videos found</p>
+              {loading ? (
+                <LoadingSkeleton />
+              ) : (
+                <>
+                  {filteredVideos.map((video) => (
+                    <VideoCard 
+                      key={video.id} 
+                      video={video} 
+                      onSelect={setSelectedVideo} 
+                    />
+                  ))}
+                  {filteredVideos.length === 0 && (
+                    <p className="text-center text-muted-foreground py-8">No videos found</p>
+                  )}
+                </>
               )}
             </div>
           </div>

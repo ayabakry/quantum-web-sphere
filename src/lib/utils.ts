@@ -51,10 +51,17 @@ export function getYoutubeThumbnail(url: string): string {
   return '';
 }
 
+// Store data both in localStorage and in the cloud database
 export function syncData(key: string, data: any): void {
   try {
     // Save data to localStorage
     localStorage.setItem(key, JSON.stringify(data));
+    
+    // Also save to session storage for temporary cross-tab sharing
+    sessionStorage.setItem(key, JSON.stringify(data));
+    
+    // Save to cloud storage - we'll use a simple approach with API
+    saveToCloud(key, data);
     
     // Broadcast the change to other tabs/windows
     const event = new CustomEvent("lovableStorage", {
@@ -66,13 +73,66 @@ export function syncData(key: string, data: any): void {
   }
 }
 
-export function loadData(key: string, defaultValue: any = []) {
+// Load data from localStorage or cloud
+export async function loadData(key: string, defaultValue: any = []): Promise<any> {
   try {
-    const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : defaultValue;
+    // First check localStorage for fresh data
+    const localData = localStorage.getItem(key);
+    if (localData) {
+      return JSON.parse(localData);
+    }
+    
+    // Then try to load from cloud
+    const cloudData = await loadFromCloud(key);
+    if (cloudData) {
+      // Save to localStorage for faster access next time
+      localStorage.setItem(key, JSON.stringify(cloudData));
+      return cloudData;
+    }
+    
+    return defaultValue;
   } catch (error) {
     console.error(`Error loading data for key: ${key}`, error);
     return defaultValue;
   }
 }
 
+// Helper function to save data to cloud (using localStorage as backup for now)
+async function saveToCloud(key: string, data: any): Promise<void> {
+  // In a real app, this would be an API call to your backend
+  // For now, we'll use localStorage with a different prefix as our "cloud"
+  try {
+    localStorage.setItem(`cloud_${key}`, JSON.stringify(data));
+    
+    // This is where you would typically make an API call:
+    // await fetch('your-api-endpoint', {
+    //   method: 'POST',
+    //   headers: { 'Content-Type': 'application/json' },
+    //   body: JSON.stringify({ key, data }),
+    // });
+    
+  } catch (error) {
+    console.error(`Error saving to cloud for key: ${key}`, error);
+  }
+}
+
+// Helper function to load data from cloud (using localStorage as backup for now)
+async function loadFromCloud(key: string): Promise<any | null> {
+  // In a real app, this would be an API call to your backend
+  // For now, we'll use localStorage with a different prefix as our "cloud"
+  try {
+    const cloudData = localStorage.getItem(`cloud_${key}`);
+    return cloudData ? JSON.parse(cloudData) : null;
+    
+    // This is where you would typically make an API call:
+    // const response = await fetch(`your-api-endpoint?key=${key}`);
+    // if (response.ok) {
+    //   return await response.json();
+    // }
+    // return null;
+    
+  } catch (error) {
+    console.error(`Error loading from cloud for key: ${key}`, error);
+    return null;
+  }
+}

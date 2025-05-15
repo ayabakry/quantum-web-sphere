@@ -4,6 +4,7 @@ import { DocumentData } from '@/components/tutorials/DocumentCard';
 import { PatentData } from '@/components/patents/PatentCard';
 import { Update } from '@/components/home/RecentUpdates';
 import { syncData, loadData } from '@/lib/utils';
+import { toast } from '@/hooks/use-toast';
 
 interface SharedDataContextType {
   videos: VideoData[];
@@ -14,6 +15,7 @@ interface SharedDataContextType {
   setDocuments: (documents: DocumentData[]) => void;
   setPatents: (patents: PatentData[]) => void;
   updateRecentUpdates: () => void;
+  loading: boolean;
 }
 
 const SharedDataContext = createContext<SharedDataContextType | undefined>(undefined);
@@ -31,41 +33,60 @@ export const SharedDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [documents, setDocumentsState] = useState<DocumentData[]>([]);
   const [patents, setPatentsState] = useState<PatentData[]>([]);
   const [recentUpdates, setRecentUpdates] = useState<Update[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Load data from localStorage on initial load
+  // Load data on initial load
   useEffect(() => {
-    // Load videos
-    setVideosState(loadData('adminVideos', []));
-    
-    // Load documents
-    setDocumentsState(loadData('adminDocuments', []));
-    
-    // Load patents
-    setPatentsState(loadData('adminPatents', []));
-    
-    // Load recent updates or generate them
-    const savedUpdates = loadData('recentUpdates', []);
-    if (savedUpdates.length > 0) {
-      setRecentUpdates(savedUpdates);
-    } else {
-      updateRecentUpdates();
-    }
+    const fetchAllData = async () => {
+      try {
+        setLoading(true);
+        
+        // Load videos
+        const videosData = await loadData('adminVideos', []);
+        setVideosState(videosData);
+        
+        // Load documents
+        const documentsData = await loadData('adminDocuments', []);
+        setDocumentsState(documentsData);
+        
+        // Load patents
+        const patentsData = await loadData('adminPatents', []);
+        setPatentsState(patentsData);
+        
+        // Load recent updates
+        const updatesData = await loadData('recentUpdates', []);
+        if (updatesData && updatesData.length > 0) {
+          setRecentUpdates(updatesData);
+        } else {
+          // Generate updates if none exist
+          updateRecentUpdatesFromData(videosData, documentsData, patentsData);
+        }
+
+        setLoading(false);
+      } catch (error) {
+        console.error("Error loading data:", error);
+        setLoading(false);
+        toast({
+          title: "Error",
+          description: "Failed to load data. Please try refreshing the page.",
+          variant: "destructive"
+        });
+      }
+    };
+
+    fetchAllData();
 
     // Listen for storage events from other tabs/windows
     const handleStorageEvent = (event: StorageEvent | CustomEvent) => {
       if (event instanceof StorageEvent) {
-        if (event.key === 'adminVideos') {
-          const newVideos = loadData('adminVideos', []);
-          setVideosState(newVideos);
-        } else if (event.key === 'adminDocuments') {
-          const newDocuments = loadData('adminDocuments', []);
-          setDocumentsState(newDocuments);
-        } else if (event.key === 'adminPatents') {
-          const newPatents = loadData('adminPatents', []);
-          setPatentsState(newPatents);
-        } else if (event.key === 'recentUpdates') {
-          const newUpdates = loadData('recentUpdates', []);
-          setRecentUpdates(newUpdates);
+        if (event.key === 'adminVideos' || event.key?.startsWith('cloud_adminVideos')) {
+          loadData('adminVideos', []).then(setVideosState);
+        } else if (event.key === 'adminDocuments' || event.key?.startsWith('cloud_adminDocuments')) {
+          loadData('adminDocuments', []).then(setDocumentsState);
+        } else if (event.key === 'adminPatents' || event.key?.startsWith('cloud_adminPatents')) {
+          loadData('adminPatents', []).then(setPatentsState);
+        } else if (event.key === 'recentUpdates' || event.key?.startsWith('cloud_recentUpdates')) {
+          loadData('recentUpdates', []).then(setRecentUpdates);
         }
       } else if (event instanceof CustomEvent && event.type === 'lovableStorage') {
         const { key, data } = event.detail;
@@ -103,46 +124,6 @@ export const SharedDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const setPatents = (newPatents: PatentData[]) => {
     setPatentsState(newPatents);
     syncData('adminPatents', newPatents);
-  };
-
-  // Function to update recent updates based on latest content
-  const updateRecentUpdates = () => {
-    // Create combined array of recent items
-    const allUpdates: Update[] = [
-      ...videos.map(video => ({
-        id: parseInt(Date.now().toString() + Math.floor(Math.random() * 1000)),
-        title: video.title,
-        description: video.description.substring(0, 100) + (video.description.length > 100 ? '...' : ''),
-        date: getRelativeTimeString(new Date(video.publishedAt)),
-        type: 'video' as const,
-      })),
-      ...documents.map(doc => ({
-        id: parseInt(Date.now().toString() + Math.floor(Math.random() * 1000)),
-        title: doc.title,
-        description: doc.description.substring(0, 100) + (doc.description.length > 100 ? '...' : ''),
-        date: getRelativeTimeString(new Date(doc.uploadedAt)),
-        type: 'tutorial' as const,
-      })),
-      ...patents.map(patent => ({
-        id: parseInt(Date.now().toString() + Math.floor(Math.random() * 1000)),
-        title: patent.title,
-        description: patent.abstract.substring(0, 100) + (patent.abstract.length > 100 ? '...' : ''),
-        date: getRelativeTimeString(new Date(patent.publicationDate)),
-        type: 'patent' as const,
-      })),
-    ];
-
-    // Sort by most recent first (assuming date is in a format that can be compared)
-    allUpdates.sort((a, b) => {
-      const dateA = parseRelativeDate(a.date);
-      const dateB = parseRelativeDate(b.date);
-      return dateA > dateB ? -1 : 1;
-    });
-
-    // Take the most recent 3 updates
-    const latestUpdates = allUpdates.slice(0, 3);
-    setRecentUpdates(latestUpdates);
-    syncData('recentUpdates', latestUpdates);
   };
 
   // Helper to convert date to relative time
@@ -193,6 +174,55 @@ export const SharedDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return now;
   };
 
+  // Function to create updates from the available data
+  const updateRecentUpdatesFromData = (
+    videosData: VideoData[] = videos,
+    documentsData: DocumentData[] = documents,
+    patentsData: PatentData[] = patents
+  ) => {
+    // Create combined array of recent items
+    const allUpdates: Update[] = [
+      ...videosData.map(video => ({
+        id: parseInt(Date.now().toString() + Math.floor(Math.random() * 1000)),
+        title: video.title,
+        description: video.description.substring(0, 100) + (video.description.length > 100 ? '...' : ''),
+        date: getRelativeTimeString(new Date(video.publishedAt)),
+        type: 'video' as const,
+      })),
+      ...documentsData.map(doc => ({
+        id: parseInt(Date.now().toString() + Math.floor(Math.random() * 1000)),
+        title: doc.title,
+        description: doc.description.substring(0, 100) + (doc.description.length > 100 ? '...' : ''),
+        date: getRelativeTimeString(new Date(doc.uploadedAt)),
+        type: 'tutorial' as const,
+      })),
+      ...patentsData.map(patent => ({
+        id: parseInt(Date.now().toString() + Math.floor(Math.random() * 1000)),
+        title: patent.title,
+        description: patent.abstract.substring(0, 100) + (patent.abstract.length > 100 ? '...' : ''),
+        date: getRelativeTimeString(new Date(patent.publicationDate)),
+        type: 'patent' as const,
+      })),
+    ];
+
+    // Sort by most recent first
+    allUpdates.sort((a, b) => {
+      const dateA = parseRelativeDate(a.date);
+      const dateB = parseRelativeDate(b.date);
+      return dateA > dateB ? -1 : 1;
+    });
+
+    // Take the most recent 3 updates
+    const latestUpdates = allUpdates.slice(0, 3);
+    setRecentUpdates(latestUpdates);
+    syncData('recentUpdates', latestUpdates);
+  };
+
+  // Public method to update recent updates
+  const updateRecentUpdates = () => {
+    updateRecentUpdatesFromData();
+  };
+
   return (
     <SharedDataContext.Provider
       value={{
@@ -204,6 +234,7 @@ export const SharedDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setDocuments,
         setPatents,
         updateRecentUpdates,
+        loading
       }}
     >
       {children}
