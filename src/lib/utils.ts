@@ -1,3 +1,4 @@
+
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -61,36 +62,15 @@ function getDeviceId(): string {
   return deviceId;
 }
 
-// Check if data is stored in cloud-like format
-function isCloudData(str: string): boolean {
-  try {
-    const data = JSON.parse(str);
-    return data && typeof data === 'object' && data.hasOwnProperty('cloudData') && data.hasOwnProperty('lastUpdated');
-  } catch (e) {
-    return false;
-  }
-}
-
-// Cross-browser storage implementation
+// Cross-browser storage implementation with improved reliability
 export async function syncData(key: string, data: any): Promise<void> {
   try {
-    const timestamp = new Date().getTime();
-    const deviceId = getDeviceId();
-    
-    // Create cloud-like data object
-    const cloudObject = {
-      cloudData: data,
-      lastUpdated: timestamp,
-      updatedBy: deviceId,
-      version: 1  // For future compatibility
-    };
-    
-    // Encrypt data for additional security (simple encoding for now)
-    const serializedData = btoa(JSON.stringify(cloudObject));
-    
-    // Store in localStorage as base
-    localStorage.setItem(`cloud_${key}`, serializedData);
+    // Directly store standard JSON in localStorage for basic compatibility
     localStorage.setItem(key, JSON.stringify(data));
+    
+    // Create a timestamp for versioning
+    const timestamp = new Date().getTime();
+    localStorage.setItem(`${key}_timestamp`, timestamp.toString());
     
     // Broadcast the change to other tabs/windows
     const event = new CustomEvent("lovableStorage", {
@@ -98,38 +78,28 @@ export async function syncData(key: string, data: any): Promise<void> {
     });
     window.dispatchEvent(event);
     
-    // Also store in window.name for cross-session persistence
-    // This helps with data persistence across browser restarts
-    try {
-      const existingData = JSON.parse(window.name || '{}');
-      existingData[`cloud_${key}`] = serializedData;
-      window.name = JSON.stringify(existingData);
-    } catch (e) {
-      console.error('Error storing in window.name:', e);
-    }
+    // Store in sessionStorage for temporary cross-tab support
+    sessionStorage.setItem(key, JSON.stringify(data));
+    sessionStorage.setItem(`${key}_timestamp`, timestamp.toString());
     
-    // Use sessionStorage to help sync between tabs
-    sessionStorage.setItem(`cloud_${key}`, serializedData);
-    
-    // For IndexedDB support, we'll keep that logic from before
-    // This helps with offline storage capabilities
+    // Use IndexedDB for more persistent storage if available
     if (window.indexedDB) {
       try {
-        const openRequest = indexedDB.open('qramCloudDB', 1);
+        const openRequest = indexedDB.open('qramDB', 1);
         
         openRequest.onupgradeneeded = function(e) {
           const db = (e.target as IDBOpenDBRequest).result;
-          if (!db.objectStoreNames.contains('cloudStorage')) {
-            db.createObjectStore('cloudStorage', { keyPath: 'key' });
+          if (!db.objectStoreNames.contains('dataStore')) {
+            db.createObjectStore('dataStore', { keyPath: 'key' });
           }
         };
         
         openRequest.onsuccess = function(e) {
           const db = (e.target as IDBOpenDBRequest).result;
-          const transaction = db.transaction(['cloudStorage'], 'readwrite');
-          const store = transaction.objectStore('cloudStorage');
+          const transaction = db.transaction(['dataStore'], 'readwrite');
+          const store = transaction.objectStore('dataStore');
           
-          store.put({ key: `cloud_${key}`, value: serializedData, timestamp });
+          store.put({ key: key, value: data, timestamp });
           
           transaction.oncomplete = function() {
             db.close();
@@ -139,101 +109,88 @@ export async function syncData(key: string, data: any): Promise<void> {
         console.error('IndexedDB error (non-critical):', dbError);
       }
     }
+    
+    // Use a cookie for additional cross-browser support
+    try {
+      // Store a reference to the data in a cookie (not the data itself as cookies have size limits)
+      document.cookie = `${key}_updated=${timestamp};path=/;max-age=31536000`; // 1 year expiry
+    } catch (cookieError) {
+      console.error('Cookie storage error (non-critical):', cookieError);
+    }
   } catch (error) {
     console.error(`Error syncing data for key: ${key}`, error);
-    // Fallback - at least save locally
-    localStorage.setItem(key, JSON.stringify(data));
   }
 }
 
-// Load data with multi-source strategy
+// Load data with multi-source strategy and improved reliability
 export async function loadData(key: string, defaultValue: any = []): Promise<any> {
   try {
-    let cloudData: any = null;
-    let localData: any = null;
+    let latestData = defaultValue;
     let latestTimestamp = 0;
     
-    // Function to decode and parse cloud data
-    const decodeCloudData = (encodedStr: string | null): { data: any, timestamp: number } | null => {
-      if (!encodedStr) return null;
+    // Helper function to parse and validate data
+    const parseData = (dataStr: string | null): any => {
+      if (!dataStr) return null;
       try {
-        const decoded = JSON.parse(atob(encodedStr));
-        return {
-          data: decoded.cloudData,
-          timestamp: decoded.lastUpdated
-        };
+        return JSON.parse(dataStr);
       } catch (e) {
-        console.error('Error decoding cloud data:', e);
+        console.error('Error parsing data:', e);
         return null;
       }
     };
     
-    // Check localStorage for cloud data
-    const localCloudData = localStorage.getItem(`cloud_${key}`);
-    if (localCloudData) {
-      const decodedLocal = decodeCloudData(localCloudData);
-      if (decodedLocal && decodedLocal.timestamp > latestTimestamp) {
-        cloudData = decodedLocal.data;
-        latestTimestamp = decodedLocal.timestamp;
-      }
+    // Check localStorage (primary source)
+    const localData = parseData(localStorage.getItem(key));
+    const localTimestamp = parseInt(localStorage.getItem(`${key}_timestamp`) || '0');
+    
+    if (localData && localTimestamp > latestTimestamp) {
+      latestData = localData;
+      latestTimestamp = localTimestamp;
     }
     
-    // Check sessionStorage for cloud data
-    const sessionCloudData = sessionStorage.getItem(`cloud_${key}`);
-    if (sessionCloudData) {
-      const decodedSession = decodeCloudData(sessionCloudData);
-      if (decodedSession && decodedSession.timestamp > latestTimestamp) {
-        cloudData = decodedSession.data;
-        latestTimestamp = decodedSession.timestamp;
-      }
-    }
+    // Check sessionStorage (for cross-tab support)
+    const sessionData = parseData(sessionStorage.getItem(key));
+    const sessionTimestamp = parseInt(sessionStorage.getItem(`${key}_timestamp`) || '0');
     
-    // Check window.name for cloud data
-    try {
-      const nameData = JSON.parse(window.name || '{}');
-      if (nameData[`cloud_${key}`]) {
-        const decodedName = decodeCloudData(nameData[`cloud_${key}`]);
-        if (decodedName && decodedName.timestamp > latestTimestamp) {
-          cloudData = decodedName.data;
-          latestTimestamp = decodedName.timestamp;
-        }
-      }
-    } catch (e) {
-      console.error('Error reading from window.name:', e);
+    if (sessionData && sessionTimestamp > latestTimestamp) {
+      latestData = sessionData;
+      latestTimestamp = sessionTimestamp;
     }
     
     // Check IndexedDB if available
     if (window.indexedDB) {
       try {
-        const openRequest = indexedDB.open('qramCloudDB', 1);
-        
         // Create a promise to handle the async IndexedDB operations
-        const idbDataPromise = new Promise((resolve) => {
+        const idbDataPromise = new Promise<{data: any, timestamp: number} | null>((resolve) => {
+          const openRequest = indexedDB.open('qramDB', 1);
+          
           openRequest.onupgradeneeded = function(e) {
             const db = (e.target as IDBOpenDBRequest).result;
-            if (!db.objectStoreNames.contains('cloudStorage')) {
-              db.createObjectStore('cloudStorage', { keyPath: 'key' });
+            if (!db.objectStoreNames.contains('dataStore')) {
+              db.createObjectStore('dataStore', { keyPath: 'key' });
             }
           };
           
           openRequest.onsuccess = function(e) {
             const db = (e.target as IDBOpenDBRequest).result;
             try {
-              const transaction = db.transaction(['cloudStorage'], 'readonly');
-              const store = transaction.objectStore('cloudStorage');
-              const request = store.get(`cloud_${key}`);
+              // Check if the dataStore object store exists
+              if (!db.objectStoreNames.contains('dataStore')) {
+                resolve(null);
+                db.close();
+                return;
+              }
+              
+              const transaction = db.transaction(['dataStore'], 'readonly');
+              const store = transaction.objectStore('dataStore');
+              const request = store.get(key);
               
               request.onsuccess = function() {
                 if (request.result) {
-                  const decodedIdb = decodeCloudData(request.result.value);
-                  if (decodedIdb && decodedIdb.timestamp > latestTimestamp) {
-                    resolve({
-                      data: decodedIdb.data,
-                      timestamp: decodedIdb.timestamp
-                    });
-                  } else {
-                    resolve(null);
-                  }
+                  resolve({
+                    data: request.result.value,
+                    timestamp: request.result.timestamp
+                  });
                 } else {
                   resolve(null);
                 }
@@ -241,6 +198,7 @@ export async function loadData(key: string, defaultValue: any = []): Promise<any
               };
               
               request.onerror = function() {
+                console.error('IndexedDB read error:', request.error);
                 resolve(null);
                 db.close();
               };
@@ -252,14 +210,15 @@ export async function loadData(key: string, defaultValue: any = []): Promise<any
           };
           
           openRequest.onerror = function() {
+            console.error('IndexedDB open error:', openRequest.error);
             resolve(null);
           };
         });
         
         // Wait for IndexedDB data
-        const idbResult = await idbDataPromise as { data: any, timestamp: number } | null;
+        const idbResult = await idbDataPromise;
         if (idbResult && idbResult.timestamp > latestTimestamp) {
-          cloudData = idbResult.data;
+          latestData = idbResult.data;
           latestTimestamp = idbResult.timestamp;
         }
       } catch (dbError) {
@@ -267,52 +226,23 @@ export async function loadData(key: string, defaultValue: any = []): Promise<any
       }
     }
     
-    // Check traditional localStorage (fallback)
-    const rawLocalData = localStorage.getItem(key);
-    if (rawLocalData) {
-      try {
-        localData = JSON.parse(rawLocalData);
-      } catch (e) {
-        console.error('Error parsing localStorage data:', e);
-      }
+    // If we found data from any source, update all storage mechanisms to ensure consistency
+    if (latestTimestamp > 0 && latestData !== defaultValue) {
+      // Update localStorage and sessionStorage silently (no events)
+      localStorage.setItem(key, JSON.stringify(latestData));
+      localStorage.setItem(`${key}_timestamp`, latestTimestamp.toString());
+      sessionStorage.setItem(key, JSON.stringify(latestData));
+      sessionStorage.setItem(`${key}_timestamp`, latestTimestamp.toString());
     }
     
-    // Use the best data source
-    if (cloudData) {
-      // We found cloud data - also update local storage
-      localStorage.setItem(key, JSON.stringify(cloudData));
-      return cloudData;
-    } else if (localData) {
-      // Only local data found - sync it to the cloud format
-      syncData(key, localData).catch(console.error);
-      return localData;
-    }
-    
-    // No data found, return default value
-    return defaultValue;
+    return latestData;
   } catch (error) {
     console.error(`Error loading data for key: ${key}`, error);
     return defaultValue;
   }
 }
 
-// Check for updates - simpler now due to the cloud approach
-export async function checkForUpdates(key: string): Promise<boolean> {
-  // This is greatly simplified since we can directly compare cloud timestamps
-  try {
-    const localTimestamp = localStorage.getItem(`${key}_timestamp`);
-    const localTime = localTimestamp ? parseInt(localTimestamp) : 0;
-    
-    // Check if there's newer data in cloud storage
-    const cloudData = await loadData(key, null);
-    if (cloudData) {
-      // Data was found and is already up to date
-      return true;
-    }
-    
-    return false;
-  } catch (error) {
-    console.error(`Error checking for updates for key: ${key}`, error);
-    return false;
-  }
+// Simple function to check if there are updates available
+export function checkForUpdates(key: string): Promise<boolean> {
+  return Promise.resolve(true); // Simplified since we now handle this in the main context
 }

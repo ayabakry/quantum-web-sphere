@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { VideoData } from '@/components/videos/VideoCard';
 import { DocumentData } from '@/components/tutorials/DocumentCard';
@@ -39,14 +40,14 @@ export const SharedDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<number>(0);
 
-  // Load data on initial load with cloud storage support
+  // Load data on initial load with improved storage system
   useEffect(() => {
     const fetchAllData = async () => {
       try {
         setLoading(true);
         setIsSyncing(true);
         
-        console.log('Loading data from cloud storage...');
+        console.log('Loading data from storage...');
         
         // Load videos
         const videosData = await loadData('adminVideos', []);
@@ -78,9 +79,9 @@ export const SharedDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setIsSyncing(false);
         setLastSyncTime(Date.now());
         
-        // Check for cloud updates immediately after loading
+        // Check for updates immediately after loading
         setTimeout(() => {
-          checkForCloudUpdates();
+          checkForUpdates();
         }, 1000);
       } catch (error) {
         console.error("Error loading data:", error);
@@ -98,7 +99,7 @@ export const SharedDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     // Setup periodic data refresh to check for updates
     const refreshInterval = setInterval(() => {
-      checkForCloudUpdates();
+      checkForUpdates();
     }, 10000); // Check every 10 seconds
     
     // Listen for storage events from other tabs/windows
@@ -106,19 +107,16 @@ export const SharedDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       console.log('Storage event detected:', event);
       
       if (event instanceof StorageEvent) {
-        const keyCheck = (eventKey: string | null, dataKey: string) => 
-          eventKey === dataKey || eventKey === `cloud_${dataKey}`;
-        
-        if (event.key && keyCheck(event.key, 'adminVideos')) {
+        if (event.key === 'adminVideos') {
           console.log('Videos update detected in storage event');
           loadData('adminVideos', []).then(setVideosState);
-        } else if (event.key && keyCheck(event.key, 'adminDocuments')) {
+        } else if (event.key === 'adminDocuments') {
           console.log('Documents update detected in storage event');
           loadData('adminDocuments', []).then(setDocumentsState);
-        } else if (event.key && keyCheck(event.key, 'adminPatents')) {
+        } else if (event.key === 'adminPatents') {
           console.log('Patents update detected in storage event');
           loadData('adminPatents', []).then(setPatentsState);
-        } else if (event.key && keyCheck(event.key, 'recentUpdates')) {
+        } else if (event.key === 'recentUpdates') {
           console.log('Updates update detected in storage event');
           loadData('recentUpdates', []).then(setRecentUpdates);
         }
@@ -147,8 +145,8 @@ export const SharedDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     };
   }, []);
 
-  // Check for updates from cloud storage
-  const checkForCloudUpdates = async () => {
+  // Check for updates from all storage mechanisms
+  const checkForUpdates = async () => {
     // Don't check if we're already syncing
     if (isSyncing) return;
     
@@ -157,40 +155,40 @@ export const SharedDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     
     try {
       setIsSyncing(true);
-      console.log('Checking for cloud updates...');
+      console.log('Checking for updates...');
       
       // Check for video updates
       const videosData = await loadData('adminVideos', []);
       if (JSON.stringify(videosData) !== JSON.stringify(videos)) {
-        console.log('New videos data from cloud:', videosData);
+        console.log('New videos data found:', videosData);
         setVideosState(videosData);
       }
       
       // Check for document updates
       const documentsData = await loadData('adminDocuments', []);
       if (JSON.stringify(documentsData) !== JSON.stringify(documents)) {
-        console.log('New documents data from cloud:', documentsData);
+        console.log('New documents data found:', documentsData);
         setDocumentsState(documentsData);
       }
       
       // Check for patent updates
       const patentsData = await loadData('adminPatents', []);
       if (JSON.stringify(patentsData) !== JSON.stringify(patents)) {
-        console.log('New patents data from cloud:', patentsData);
+        console.log('New patents data found:', patentsData);
         setPatentsState(patentsData);
       }
       
       // Check for updates updates
       const updatesData = await loadData('recentUpdates', []);
       if (updatesData.length > 0 && JSON.stringify(updatesData) !== JSON.stringify(recentUpdates)) {
-        console.log('New updates data from cloud:', updatesData);
+        console.log('New updates data found:', updatesData);
         setRecentUpdates(updatesData);
       }
       
       setIsSyncing(false);
       setLastSyncTime(Date.now());
     } catch (error) {
-      console.error('Error checking for cloud updates:', error);
+      console.error('Error checking for updates:', error);
       setIsSyncing(false);
     }
   };

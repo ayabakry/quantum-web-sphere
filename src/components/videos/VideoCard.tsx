@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { getYoutubeThumbnail } from '@/lib/utils';
+import { getYoutubeThumbnail, syncData } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export interface VideoData {
@@ -47,24 +47,8 @@ const VideoCard: React.FC<VideoCardProps> = ({ video, onSelect }) => {
                   v.id === video.id ? updatedVideo : v
                 );
                 
-                // Save using both localStorage and cloud storage mechanisms
-                localStorage.setItem('adminVideos', JSON.stringify(updatedVideos));
-                
-                // Only update cloud storage if this is a significant change to avoid
-                // unnecessary synchronization operations
-                const cloudDataString = localStorage.getItem('cloud_adminVideos');
-                if (cloudDataString && !video.thumbnail) {
-                  // This is a new thumbnail, so update the cloud data
-                  try {
-                    // We're importing from @/lib/utils, so we can use the syncData function
-                    // without importing it explicitly
-                    import('@/lib/utils').then(utils => {
-                      utils.syncData('adminVideos', updatedVideos).catch(console.error);
-                    });
-                  } catch (cloudError) {
-                    console.error("Error updating cloud data:", cloudError);
-                  }
-                }
+                // Save using the improved syncData function
+                syncData('adminVideos', updatedVideos).catch(console.error);
               } catch (parseError) {
                 console.error("Error parsing videos cache:", parseError);
               }

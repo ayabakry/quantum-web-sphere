@@ -23,7 +23,7 @@ const RecentUpdates: React.FC = () => {
     const loadInitialUpdates = async () => {
       try {
         setIsLocalLoading(true);
-        // Try to load from any available storage mechanism
+        // Try to load from any available storage mechanism using the improved loadData function
         const cachedUpdates = await loadData('recentUpdates', []);
         if (cachedUpdates && cachedUpdates.length > 0) {
           console.log('Loaded cached updates:', cachedUpdates);
