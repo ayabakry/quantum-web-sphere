@@ -4,7 +4,7 @@ import { VideoData } from '@/components/videos/VideoCard';
 import { DocumentData } from '@/components/tutorials/DocumentCard';
 import { PatentData } from '@/components/patents/PatentCard';
 import { Update } from '@/components/home/RecentUpdates';
-import { syncData, loadData } from '@/lib/utils';
+import { syncData, loadData, checkForUpdates } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 
 interface SharedDataContextType {
@@ -80,30 +80,42 @@ export const SharedDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     // Setup periodic data refresh to check for updates from other devices
     const refreshInterval = setInterval(async () => {
       try {
-        // Check for updated data in IndexedDB/cloud storage
-        const videosData = await loadData('adminVideos');
-        if (videosData && videosData.length > 0 && JSON.stringify(videosData) !== JSON.stringify(videos)) {
-          setVideosState(videosData);
+        // Check for updated data from other devices/browsers
+        const hasVideoUpdates = await checkForUpdates('adminVideos');
+        if (hasVideoUpdates) {
+          const videosData = await loadData('adminVideos', []);
+          if (videosData && videosData.length > 0) {
+            setVideosState(videosData);
+          }
         }
         
-        const documentsData = await loadData('adminDocuments');
-        if (documentsData && documentsData.length > 0 && JSON.stringify(documentsData) !== JSON.stringify(documents)) {
-          setDocumentsState(documentsData);
+        const hasDocumentUpdates = await checkForUpdates('adminDocuments');
+        if (hasDocumentUpdates) {
+          const documentsData = await loadData('adminDocuments', []);
+          if (documentsData && documentsData.length > 0) {
+            setDocumentsState(documentsData);
+          }
         }
         
-        const patentsData = await loadData('adminPatents');
-        if (patentsData && patentsData.length > 0 && JSON.stringify(patentsData) !== JSON.stringify(patents)) {
-          setPatentsState(patentsData);
+        const hasPatentUpdates = await checkForUpdates('adminPatents');
+        if (hasPatentUpdates) {
+          const patentsData = await loadData('adminPatents', []);
+          if (patentsData && patentsData.length > 0) {
+            setPatentsState(patentsData);
+          }
         }
         
-        const updatesData = await loadData('recentUpdates');
-        if (updatesData && updatesData.length > 0 && JSON.stringify(updatesData) !== JSON.stringify(recentUpdates)) {
-          setRecentUpdates(updatesData);
+        const hasUpdateUpdates = await checkForUpdates('recentUpdates');
+        if (hasUpdateUpdates) {
+          const updatesData = await loadData('recentUpdates', []);
+          if (updatesData && updatesData.length > 0) {
+            setRecentUpdates(updatesData);
+          }
         }
       } catch (error) {
         console.error("Error refreshing data:", error);
       }
-    }, 30000); // Check every 30 seconds
+    }, 10000); // Check every 10 seconds
     
     // Listen for storage events from other tabs/windows
     const handleStorageEvent = (event: StorageEvent | CustomEvent) => {
@@ -142,21 +154,33 @@ export const SharedDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       window.removeEventListener('storage', handleStorageEvent);
       window.removeEventListener('lovableStorage', handleStorageEvent as EventListener);
     };
-  }, [videos, documents, patents, recentUpdates]);
+  }, []);
 
-  const setVideos = (newVideos: VideoData[]) => {
+  const setVideos = async (newVideos: VideoData[]) => {
     setVideosState(newVideos);
-    syncData('adminVideos', newVideos);
+    await syncData('adminVideos', newVideos);
+    toast({
+      title: "Videos Saved",
+      description: "Your videos have been saved and will be available across devices.",
+    });
   };
 
-  const setDocuments = (newDocuments: DocumentData[]) => {
+  const setDocuments = async (newDocuments: DocumentData[]) => {
     setDocumentsState(newDocuments);
-    syncData('adminDocuments', newDocuments);
+    await syncData('adminDocuments', newDocuments);
+    toast({
+      title: "Documents Saved",
+      description: "Your documents have been saved and will be available across devices.",
+    });
   };
 
-  const setPatents = (newPatents: PatentData[]) => {
+  const setPatents = async (newPatents: PatentData[]) => {
     setPatentsState(newPatents);
-    syncData('adminPatents', newPatents);
+    await syncData('adminPatents', newPatents);
+    toast({
+      title: "Patents Saved",
+      description: "Your patents have been saved and will be available across devices.",
+    });
   };
 
   // Helper to convert date to relative time
@@ -248,7 +272,7 @@ export const SharedDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     // Take the most recent 3 updates
     const latestUpdates = allUpdates.slice(0, 3);
     setRecentUpdates(latestUpdates);
-    syncData('recentUpdates', latestUpdates);
+    syncData('recentUpdates', latestUpdates).catch(console.error);
   };
 
   // Public method to update recent updates

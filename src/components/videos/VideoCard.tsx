@@ -31,6 +31,26 @@ const VideoCard: React.FC<VideoCardProps> = ({ video, onSelect }) => {
       } else {
         const generatedUrl = getYoutubeThumbnail(video.id);
         setThumbnailUrl(generatedUrl);
+        
+        // Cache the thumbnail for better performance
+        if (generatedUrl) {
+          try {
+            // Update the video object to include the thumbnail
+            const updatedVideo = { ...video, thumbnail: generatedUrl };
+            // This could be done at a higher level in the SharedDataContext
+            // but we're adding it here as a backup
+            const videosCacheString = localStorage.getItem('adminVideos');
+            if (videosCacheString) {
+              const videosCache = JSON.parse(videosCacheString);
+              const updatedVideos = videosCache.map((v: VideoData) => 
+                v.id === video.id ? updatedVideo : v
+              );
+              localStorage.setItem('adminVideos', JSON.stringify(updatedVideos));
+            }
+          } catch (error) {
+            console.error("Error caching thumbnail:", error);
+          }
+        }
       }
     };
     
