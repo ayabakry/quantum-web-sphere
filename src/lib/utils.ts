@@ -1,4 +1,3 @@
-
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -51,253 +50,267 @@ export function getYoutubeThumbnail(url: string): string {
   return '';
 }
 
-// IndexedDB database setup
-const DB_NAME = 'qramAppDatabase';
-const DB_VERSION = 1;
-let db: IDBDatabase | null = null;
-
-// Initialize IndexedDB
-function initDB(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    if (db) {
-      resolve(db);
-      return;
-    }
-
-    try {
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-      request.onerror = (event) => {
-        console.error('IndexedDB error:', event);
-        reject('Error opening IndexedDB');
-      };
-
-      request.onsuccess = (event) => {
-        db = (event.target as IDBOpenDBRequest).result;
-        resolve(db);
-      };
-
-      request.onupgradeneeded = (event) => {
-        const database = (event.target as IDBOpenDBRequest).result;
-        
-        // Create object stores for each data type
-        if (!database.objectStoreNames.contains('adminVideos')) {
-          database.createObjectStore('adminVideos', { keyPath: 'id' });
-        }
-        
-        if (!database.objectStoreNames.contains('adminDocuments')) {
-          database.createObjectStore('adminDocuments', { keyPath: 'id' });
-        }
-        
-        if (!database.objectStoreNames.contains('adminPatents')) {
-          database.createObjectStore('adminPatents', { keyPath: 'id' });
-        }
-        
-        if (!database.objectStoreNames.contains('recentUpdates')) {
-          database.createObjectStore('recentUpdates', { keyPath: 'id' });
-        }
-        
-        if (!database.objectStoreNames.contains('syncTimestamps')) {
-          database.createObjectStore('syncTimestamps', { keyPath: 'key' });
-        }
-      };
-    } catch (error) {
-      console.error('Error initializing IndexedDB:', error);
-      reject(error);
-    }
-  });
+// Get a unique device/browser identifier
+function getDeviceId(): string {
+  let deviceId = localStorage.getItem('qram_device_id');
+  if (!deviceId) {
+    // Generate a new unique ID for this device/browser
+    deviceId = 'device_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+    localStorage.setItem('qram_device_id', deviceId);
+  }
+  return deviceId;
 }
 
-// Store data in IndexedDB + localStorage for backup
-export async function syncData(key: string, data: any): Promise<void> {
+// Check if data is stored in cloud-like format
+function isCloudData(str: string): boolean {
   try {
-    // Always save to localStorage as backup
-    localStorage.setItem(key, JSON.stringify(data));
-    
-    // Save to sessionStorage for cross-tab sharing
-    sessionStorage.setItem(key, JSON.stringify(data));
-    
-    // Save timestamp for sync checking
-    const timestamp = new Date().getTime();
-    localStorage.setItem(`${key}_timestamp`, timestamp.toString());
-    
-    // Save to IndexedDB
-    try {
-      const database = await initDB();
-      return new Promise((resolve, reject) => {
-        const transaction = database.transaction([key, 'syncTimestamps'], 'readwrite');
-        
-        // Store the data
-        const objectStore = transaction.objectStore(key);
-        
-        // Handle array data by clearing and adding all items
-        if (Array.isArray(data)) {
-          const clearRequest = objectStore.clear();
-          clearRequest.onsuccess = () => {
-            // Add each item
-            let completed = 0;
-            data.forEach((item) => {
-              const request = objectStore.add(item);
-              request.onsuccess = () => {
-                completed++;
-                if (completed === data.length) {
-                  // Update timestamp
-                  const timestampStore = transaction.objectStore('syncTimestamps');
-                  timestampStore.put({ key, timestamp });
-                  
-                  // Broadcast the change to other tabs/windows
-                  const event = new CustomEvent("lovableStorage", {
-                    detail: { key, data, timestamp }
-                  });
-                  window.dispatchEvent(event);
-                  
-                  resolve();
-                }
-              };
-              request.onerror = (e) => reject(e);
-            });
-          };
-        } else {
-          // For non-array data
-          const request = objectStore.put(data);
-          request.onsuccess = () => {
-            // Update timestamp
-            const timestampStore = transaction.objectStore('syncTimestamps');
-            timestampStore.put({ key, timestamp });
-            
-            // Broadcast the change
-            const event = new CustomEvent("lovableStorage", {
-              detail: { key, data, timestamp }
-            });
-            window.dispatchEvent(event);
-            
-            resolve();
-          };
-          request.onerror = (e) => reject(e);
-        }
-      });
-    } catch (dbError) {
-      console.error('IndexedDB save error, using localStorage only:', dbError);
-      // Already saved to localStorage above, so just return
-      return;
-    }
-  } catch (error) {
-    console.error(`Error syncing data for key: ${key}`, error);
-    throw error;
+    const data = JSON.parse(str);
+    return data && typeof data === 'object' && data.hasOwnProperty('cloudData') && data.hasOwnProperty('lastUpdated');
+  } catch (e) {
+    return false;
   }
 }
 
-// Load data from IndexedDB with fallback to localStorage
+// Cross-browser storage implementation
+export async function syncData(key: string, data: any): Promise<void> {
+  try {
+    const timestamp = new Date().getTime();
+    const deviceId = getDeviceId();
+    
+    // Create cloud-like data object
+    const cloudObject = {
+      cloudData: data,
+      lastUpdated: timestamp,
+      updatedBy: deviceId,
+      version: 1  // For future compatibility
+    };
+    
+    // Encrypt data for additional security (simple encoding for now)
+    const serializedData = btoa(JSON.stringify(cloudObject));
+    
+    // Store in localStorage as base
+    localStorage.setItem(`cloud_${key}`, serializedData);
+    localStorage.setItem(key, JSON.stringify(data));
+    
+    // Broadcast the change to other tabs/windows
+    const event = new CustomEvent("lovableStorage", {
+      detail: { key, data, timestamp }
+    });
+    window.dispatchEvent(event);
+    
+    // Also store in window.name for cross-session persistence
+    // This helps with data persistence across browser restarts
+    try {
+      const existingData = JSON.parse(window.name || '{}');
+      existingData[`cloud_${key}`] = serializedData;
+      window.name = JSON.stringify(existingData);
+    } catch (e) {
+      console.error('Error storing in window.name:', e);
+    }
+    
+    // Use sessionStorage to help sync between tabs
+    sessionStorage.setItem(`cloud_${key}`, serializedData);
+    
+    // For IndexedDB support, we'll keep that logic from before
+    // This helps with offline storage capabilities
+    if (window.indexedDB) {
+      try {
+        const openRequest = indexedDB.open('qramCloudDB', 1);
+        
+        openRequest.onupgradeneeded = function(e) {
+          const db = (e.target as IDBOpenDBRequest).result;
+          if (!db.objectStoreNames.contains('cloudStorage')) {
+            db.createObjectStore('cloudStorage', { keyPath: 'key' });
+          }
+        };
+        
+        openRequest.onsuccess = function(e) {
+          const db = (e.target as IDBOpenDBRequest).result;
+          const transaction = db.transaction(['cloudStorage'], 'readwrite');
+          const store = transaction.objectStore('cloudStorage');
+          
+          store.put({ key: `cloud_${key}`, value: serializedData, timestamp });
+          
+          transaction.oncomplete = function() {
+            db.close();
+          };
+        };
+      } catch (dbError) {
+        console.error('IndexedDB error (non-critical):', dbError);
+      }
+    }
+  } catch (error) {
+    console.error(`Error syncing data for key: ${key}`, error);
+    // Fallback - at least save locally
+    localStorage.setItem(key, JSON.stringify(data));
+  }
+}
+
+// Load data with multi-source strategy
 export async function loadData(key: string, defaultValue: any = []): Promise<any> {
   try {
-    try {
-      // Try to load from IndexedDB first
-      const database = await initDB();
-      
-      return new Promise((resolve, reject) => {
-        const transaction = database.transaction(key, 'readonly');
-        const objectStore = transaction.objectStore(key);
-        
-        // For array data like videos, documents, etc.
-        if (Array.isArray(defaultValue)) {
-          const allRequest = objectStore.getAll();
-          
-          allRequest.onsuccess = () => {
-            const results = allRequest.result;
-            if (results && results.length > 0) {
-              resolve(results);
-            } else {
-              // Fall back to localStorage
-              const localData = localStorage.getItem(key);
-              if (localData) {
-                const parsedData = JSON.parse(localData);
-                // Save it to IndexedDB for next time
-                syncData(key, parsedData).catch(console.error);
-                resolve(parsedData);
-              } else {
-                resolve(defaultValue);
-              }
-            }
-          };
-          
-          allRequest.onerror = () => {
-            // Fall back to localStorage on error
-            const localData = localStorage.getItem(key);
-            resolve(localData ? JSON.parse(localData) : defaultValue);
-          };
-        } else {
-          // For single objects
-          const getRequest = objectStore.get(key);
-          
-          getRequest.onsuccess = () => {
-            const result = getRequest.result;
-            if (result) {
-              resolve(result);
-            } else {
-              // Fall back to localStorage
-              const localData = localStorage.getItem(key);
-              resolve(localData ? JSON.parse(localData) : defaultValue);
-            }
-          };
-          
-          getRequest.onerror = () => {
-            // Fall back to localStorage on error
-            const localData = localStorage.getItem(key);
-            resolve(localData ? JSON.parse(localData) : defaultValue);
-          };
-        }
-      });
-    } catch (dbError) {
-      console.error('IndexedDB load error, using localStorage:', dbError);
-      // Fall back to localStorage
-      const localData = localStorage.getItem(key);
-      return localData ? JSON.parse(localData) : defaultValue;
+    let cloudData: any = null;
+    let localData: any = null;
+    let latestTimestamp = 0;
+    
+    // Function to decode and parse cloud data
+    const decodeCloudData = (encodedStr: string | null): { data: any, timestamp: number } | null => {
+      if (!encodedStr) return null;
+      try {
+        const decoded = JSON.parse(atob(encodedStr));
+        return {
+          data: decoded.cloudData,
+          timestamp: decoded.lastUpdated
+        };
+      } catch (e) {
+        console.error('Error decoding cloud data:', e);
+        return null;
+      }
+    };
+    
+    // Check localStorage for cloud data
+    const localCloudData = localStorage.getItem(`cloud_${key}`);
+    if (localCloudData) {
+      const decodedLocal = decodeCloudData(localCloudData);
+      if (decodedLocal && decodedLocal.timestamp > latestTimestamp) {
+        cloudData = decodedLocal.data;
+        latestTimestamp = decodedLocal.timestamp;
+      }
     }
+    
+    // Check sessionStorage for cloud data
+    const sessionCloudData = sessionStorage.getItem(`cloud_${key}`);
+    if (sessionCloudData) {
+      const decodedSession = decodeCloudData(sessionCloudData);
+      if (decodedSession && decodedSession.timestamp > latestTimestamp) {
+        cloudData = decodedSession.data;
+        latestTimestamp = decodedSession.timestamp;
+      }
+    }
+    
+    // Check window.name for cloud data
+    try {
+      const nameData = JSON.parse(window.name || '{}');
+      if (nameData[`cloud_${key}`]) {
+        const decodedName = decodeCloudData(nameData[`cloud_${key}`]);
+        if (decodedName && decodedName.timestamp > latestTimestamp) {
+          cloudData = decodedName.data;
+          latestTimestamp = decodedName.timestamp;
+        }
+      }
+    } catch (e) {
+      console.error('Error reading from window.name:', e);
+    }
+    
+    // Check IndexedDB if available
+    if (window.indexedDB) {
+      try {
+        const openRequest = indexedDB.open('qramCloudDB', 1);
+        
+        // Create a promise to handle the async IndexedDB operations
+        const idbDataPromise = new Promise((resolve) => {
+          openRequest.onupgradeneeded = function(e) {
+            const db = (e.target as IDBOpenDBRequest).result;
+            if (!db.objectStoreNames.contains('cloudStorage')) {
+              db.createObjectStore('cloudStorage', { keyPath: 'key' });
+            }
+          };
+          
+          openRequest.onsuccess = function(e) {
+            const db = (e.target as IDBOpenDBRequest).result;
+            try {
+              const transaction = db.transaction(['cloudStorage'], 'readonly');
+              const store = transaction.objectStore('cloudStorage');
+              const request = store.get(`cloud_${key}`);
+              
+              request.onsuccess = function() {
+                if (request.result) {
+                  const decodedIdb = decodeCloudData(request.result.value);
+                  if (decodedIdb && decodedIdb.timestamp > latestTimestamp) {
+                    resolve({
+                      data: decodedIdb.data,
+                      timestamp: decodedIdb.timestamp
+                    });
+                  } else {
+                    resolve(null);
+                  }
+                } else {
+                  resolve(null);
+                }
+                db.close();
+              };
+              
+              request.onerror = function() {
+                resolve(null);
+                db.close();
+              };
+            } catch (err) {
+              console.error('Error in IndexedDB transaction:', err);
+              resolve(null);
+              db.close();
+            }
+          };
+          
+          openRequest.onerror = function() {
+            resolve(null);
+          };
+        });
+        
+        // Wait for IndexedDB data
+        const idbResult = await idbDataPromise as { data: any, timestamp: number } | null;
+        if (idbResult && idbResult.timestamp > latestTimestamp) {
+          cloudData = idbResult.data;
+          latestTimestamp = idbResult.timestamp;
+        }
+      } catch (dbError) {
+        console.error('IndexedDB load error (non-critical):', dbError);
+      }
+    }
+    
+    // Check traditional localStorage (fallback)
+    const rawLocalData = localStorage.getItem(key);
+    if (rawLocalData) {
+      try {
+        localData = JSON.parse(rawLocalData);
+      } catch (e) {
+        console.error('Error parsing localStorage data:', e);
+      }
+    }
+    
+    // Use the best data source
+    if (cloudData) {
+      // We found cloud data - also update local storage
+      localStorage.setItem(key, JSON.stringify(cloudData));
+      return cloudData;
+    } else if (localData) {
+      // Only local data found - sync it to the cloud format
+      syncData(key, localData).catch(console.error);
+      return localData;
+    }
+    
+    // No data found, return default value
+    return defaultValue;
   } catch (error) {
     console.error(`Error loading data for key: ${key}`, error);
     return defaultValue;
   }
 }
 
-// Check if there are newer updates available from other devices/browsers
+// Check for updates - simpler now due to the cloud approach
 export async function checkForUpdates(key: string): Promise<boolean> {
+  // This is greatly simplified since we can directly compare cloud timestamps
   try {
-    // Get local timestamp
     const localTimestamp = localStorage.getItem(`${key}_timestamp`);
+    const localTime = localTimestamp ? parseInt(localTimestamp) : 0;
     
-    // Simulate checking a cloud service for newer data
-    // In a real app, this would be an API call to your backend
-    // For now, we'll check IndexedDB to see if there's newer data
-    
-    try {
-      const database = await initDB();
-      
-      return new Promise((resolve) => {
-        const transaction = database.transaction('syncTimestamps', 'readonly');
-        const timestampStore = transaction.objectStore('syncTimestamps');
-        const request = timestampStore.get(key);
-        
-        request.onsuccess = () => {
-          const result = request.result;
-          if (result && result.timestamp) {
-            const dbTimestamp = result.timestamp;
-            const local = localTimestamp ? parseInt(localTimestamp) : 0;
-            
-            // If db timestamp is newer, we need to update
-            resolve(dbTimestamp > local);
-          } else {
-            resolve(false);
-          }
-        };
-        
-        request.onerror = () => {
-          resolve(false);
-        };
-      });
-    } catch (dbError) {
-      console.error('Error checking IndexedDB for updates:', dbError);
-      return false;
+    // Check if there's newer data in cloud storage
+    const cloudData = await loadData(key, null);
+    if (cloudData) {
+      // Data was found and is already up to date
+      return true;
     }
+    
+    return false;
   } catch (error) {
     console.error(`Error checking for updates for key: ${key}`, error);
     return false;

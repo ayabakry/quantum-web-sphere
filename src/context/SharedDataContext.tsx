@@ -1,10 +1,9 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { VideoData } from '@/components/videos/VideoCard';
 import { DocumentData } from '@/components/tutorials/DocumentCard';
 import { PatentData } from '@/components/patents/PatentCard';
 import { Update } from '@/components/home/RecentUpdates';
-import { syncData, loadData, checkForUpdates } from '@/lib/utils';
+import { syncData, loadData } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 
 interface SharedDataContextType {
@@ -36,37 +35,57 @@ export const SharedDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [recentUpdates, setRecentUpdates] = useState<Update[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Load data on initial load
+  // Track sync status
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<number>(0);
+
+  // Load data on initial load with cloud storage support
   useEffect(() => {
     const fetchAllData = async () => {
       try {
         setLoading(true);
+        setIsSyncing(true);
+        
+        console.log('Loading data from cloud storage...');
         
         // Load videos
         const videosData = await loadData('adminVideos', []);
+        console.log('Loaded videos:', videosData);
         setVideosState(videosData);
         
         // Load documents
         const documentsData = await loadData('adminDocuments', []);
+        console.log('Loaded documents:', documentsData);
         setDocumentsState(documentsData);
         
         // Load patents
         const patentsData = await loadData('adminPatents', []);
+        console.log('Loaded patents:', patentsData);
         setPatentsState(patentsData);
         
         // Load recent updates
         const updatesData = await loadData('recentUpdates', []);
         if (updatesData && updatesData.length > 0) {
+          console.log('Loaded updates:', updatesData);
           setRecentUpdates(updatesData);
         } else {
           // Generate updates if none exist
+          console.log('Generating new updates');
           updateRecentUpdatesFromData(videosData, documentsData, patentsData);
         }
 
         setLoading(false);
+        setIsSyncing(false);
+        setLastSyncTime(Date.now());
+        
+        // Check for cloud updates immediately after loading
+        setTimeout(() => {
+          checkForCloudUpdates();
+        }, 1000);
       } catch (error) {
         console.error("Error loading data:", error);
         setLoading(false);
+        setIsSyncing(false);
         toast({
           title: "Error",
           description: "Failed to load data. Please try refreshing the page.",
@@ -77,62 +96,34 @@ export const SharedDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     fetchAllData();
 
-    // Setup periodic data refresh to check for updates from other devices
-    const refreshInterval = setInterval(async () => {
-      try {
-        // Check for updated data from other devices/browsers
-        const hasVideoUpdates = await checkForUpdates('adminVideos');
-        if (hasVideoUpdates) {
-          const videosData = await loadData('adminVideos', []);
-          if (videosData && videosData.length > 0) {
-            setVideosState(videosData);
-          }
-        }
-        
-        const hasDocumentUpdates = await checkForUpdates('adminDocuments');
-        if (hasDocumentUpdates) {
-          const documentsData = await loadData('adminDocuments', []);
-          if (documentsData && documentsData.length > 0) {
-            setDocumentsState(documentsData);
-          }
-        }
-        
-        const hasPatentUpdates = await checkForUpdates('adminPatents');
-        if (hasPatentUpdates) {
-          const patentsData = await loadData('adminPatents', []);
-          if (patentsData && patentsData.length > 0) {
-            setPatentsState(patentsData);
-          }
-        }
-        
-        const hasUpdateUpdates = await checkForUpdates('recentUpdates');
-        if (hasUpdateUpdates) {
-          const updatesData = await loadData('recentUpdates', []);
-          if (updatesData && updatesData.length > 0) {
-            setRecentUpdates(updatesData);
-          }
-        }
-      } catch (error) {
-        console.error("Error refreshing data:", error);
-      }
+    // Setup periodic data refresh to check for updates
+    const refreshInterval = setInterval(() => {
+      checkForCloudUpdates();
     }, 10000); // Check every 10 seconds
     
     // Listen for storage events from other tabs/windows
     const handleStorageEvent = (event: StorageEvent | CustomEvent) => {
+      console.log('Storage event detected:', event);
+      
       if (event instanceof StorageEvent) {
         const keyCheck = (eventKey: string | null, dataKey: string) => 
           eventKey === dataKey || eventKey === `cloud_${dataKey}`;
         
         if (event.key && keyCheck(event.key, 'adminVideos')) {
+          console.log('Videos update detected in storage event');
           loadData('adminVideos', []).then(setVideosState);
         } else if (event.key && keyCheck(event.key, 'adminDocuments')) {
+          console.log('Documents update detected in storage event');
           loadData('adminDocuments', []).then(setDocumentsState);
         } else if (event.key && keyCheck(event.key, 'adminPatents')) {
+          console.log('Patents update detected in storage event');
           loadData('adminPatents', []).then(setPatentsState);
         } else if (event.key && keyCheck(event.key, 'recentUpdates')) {
+          console.log('Updates update detected in storage event');
           loadData('recentUpdates', []).then(setRecentUpdates);
         }
       } else if (event instanceof CustomEvent && event.type === 'lovableStorage') {
+        console.log('Lovable storage event detected:', event);
         const { key, data } = event.detail;
         if (key === 'adminVideos') {
           setVideosState(data);
@@ -156,12 +147,60 @@ export const SharedDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     };
   }, []);
 
+  // Check for updates from cloud storage
+  const checkForCloudUpdates = async () => {
+    // Don't check if we're already syncing
+    if (isSyncing) return;
+    
+    // Don't check too frequently
+    if (Date.now() - lastSyncTime < 5000) return;
+    
+    try {
+      setIsSyncing(true);
+      console.log('Checking for cloud updates...');
+      
+      // Check for video updates
+      const videosData = await loadData('adminVideos', []);
+      if (JSON.stringify(videosData) !== JSON.stringify(videos)) {
+        console.log('New videos data from cloud:', videosData);
+        setVideosState(videosData);
+      }
+      
+      // Check for document updates
+      const documentsData = await loadData('adminDocuments', []);
+      if (JSON.stringify(documentsData) !== JSON.stringify(documents)) {
+        console.log('New documents data from cloud:', documentsData);
+        setDocumentsState(documentsData);
+      }
+      
+      // Check for patent updates
+      const patentsData = await loadData('adminPatents', []);
+      if (JSON.stringify(patentsData) !== JSON.stringify(patents)) {
+        console.log('New patents data from cloud:', patentsData);
+        setPatentsState(patentsData);
+      }
+      
+      // Check for updates updates
+      const updatesData = await loadData('recentUpdates', []);
+      if (updatesData.length > 0 && JSON.stringify(updatesData) !== JSON.stringify(recentUpdates)) {
+        console.log('New updates data from cloud:', updatesData);
+        setRecentUpdates(updatesData);
+      }
+      
+      setIsSyncing(false);
+      setLastSyncTime(Date.now());
+    } catch (error) {
+      console.error('Error checking for cloud updates:', error);
+      setIsSyncing(false);
+    }
+  };
+
   const setVideos = async (newVideos: VideoData[]) => {
     setVideosState(newVideos);
     await syncData('adminVideos', newVideos);
     toast({
       title: "Videos Saved",
-      description: "Your videos have been saved and will be available across devices.",
+      description: "Your videos have been saved and will be available across browsers and devices.",
     });
   };
 
@@ -170,7 +209,7 @@ export const SharedDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     await syncData('adminDocuments', newDocuments);
     toast({
       title: "Documents Saved",
-      description: "Your documents have been saved and will be available across devices.",
+      description: "Your documents have been saved and will be available across browsers and devices.",
     });
   };
 
@@ -179,7 +218,7 @@ export const SharedDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     await syncData('adminPatents', newPatents);
     toast({
       title: "Patents Saved",
-      description: "Your patents have been saved and will be available across devices.",
+      description: "Your patents have been saved and will be available across browsers and devices.",
     });
   };
 

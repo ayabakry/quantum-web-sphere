@@ -16,17 +16,23 @@ export type Update = {
 const RecentUpdates: React.FC = () => {
   const { recentUpdates, loading } = useSharedData();
   const [displayUpdates, setDisplayUpdates] = useState<Update[]>([]);
+  const [isLocalLoading, setIsLocalLoading] = useState(true);
 
   // Try to load updates directly for faster rendering
   useEffect(() => {
     const loadInitialUpdates = async () => {
       try {
+        setIsLocalLoading(true);
+        // Try to load from any available storage mechanism
         const cachedUpdates = await loadData('recentUpdates', []);
         if (cachedUpdates && cachedUpdates.length > 0) {
+          console.log('Loaded cached updates:', cachedUpdates);
           setDisplayUpdates(cachedUpdates);
         }
+        setIsLocalLoading(false);
       } catch (error) {
         console.error("Error loading cached updates:", error);
+        setIsLocalLoading(false);
       }
     };
     
@@ -36,6 +42,7 @@ const RecentUpdates: React.FC = () => {
   // Update from context when available
   useEffect(() => {
     if (recentUpdates && recentUpdates.length > 0) {
+      console.log('Update from context received:', recentUpdates);
       setDisplayUpdates(recentUpdates);
     }
   }, [recentUpdates]);
@@ -67,7 +74,7 @@ const RecentUpdates: React.FC = () => {
     </div>
   );
 
-  const showLoading = loading && displayUpdates.length === 0;
+  const showLoading = (loading || isLocalLoading) && displayUpdates.length === 0;
 
   return (
     <Card className="w-full h-full">

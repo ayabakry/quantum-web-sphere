@@ -35,17 +35,39 @@ const VideoCard: React.FC<VideoCardProps> = ({ video, onSelect }) => {
         // Cache the thumbnail for better performance
         if (generatedUrl) {
           try {
-            // Update the video object to include the thumbnail
+            // Create an updated video object with the thumbnail
             const updatedVideo = { ...video, thumbnail: generatedUrl };
-            // This could be done at a higher level in the SharedDataContext
-            // but we're adding it here as a backup
+            
+            // Look for this video in the existing data
             const videosCacheString = localStorage.getItem('adminVideos');
             if (videosCacheString) {
-              const videosCache = JSON.parse(videosCacheString);
-              const updatedVideos = videosCache.map((v: VideoData) => 
-                v.id === video.id ? updatedVideo : v
-              );
-              localStorage.setItem('adminVideos', JSON.stringify(updatedVideos));
+              try {
+                const videosCache = JSON.parse(videosCacheString);
+                const updatedVideos = videosCache.map((v: VideoData) => 
+                  v.id === video.id ? updatedVideo : v
+                );
+                
+                // Save using both localStorage and cloud storage mechanisms
+                localStorage.setItem('adminVideos', JSON.stringify(updatedVideos));
+                
+                // Only update cloud storage if this is a significant change to avoid
+                // unnecessary synchronization operations
+                const cloudDataString = localStorage.getItem('cloud_adminVideos');
+                if (cloudDataString && !video.thumbnail) {
+                  // This is a new thumbnail, so update the cloud data
+                  try {
+                    // We're importing from @/lib/utils, so we can use the syncData function
+                    // without importing it explicitly
+                    import('@/lib/utils').then(utils => {
+                      utils.syncData('adminVideos', updatedVideos).catch(console.error);
+                    });
+                  } catch (cloudError) {
+                    console.error("Error updating cloud data:", cloudError);
+                  }
+                }
+              } catch (parseError) {
+                console.error("Error parsing videos cache:", parseError);
+              }
             }
           } catch (error) {
             console.error("Error caching thumbnail:", error);
