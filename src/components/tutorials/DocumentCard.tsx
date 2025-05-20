@@ -12,6 +12,7 @@ export interface DocumentData {
   fileUrl: string;
   uploadedAt: string;
   fileSize: string;
+  category: string; // Added category field
 }
 
 interface DocumentCardProps {

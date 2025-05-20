@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AdminLayout from './AdminLayout';
 import ContentTable from '@/components/admin/ContentTable';
 import { Button } from '@/components/ui/button';
@@ -15,9 +15,20 @@ import { useSharedData } from '@/context/SharedDataContext';
 
 const columns = [
   { key: 'title', label: 'Title' },
+  { key: 'category', label: 'Category' },
   { key: 'fileType', label: 'File Type' },
   { key: 'uploadedAt', label: 'Upload Date' },
   { key: 'fileSize', label: 'File Size' },
+];
+
+// Predefined categories
+const CATEGORIES = [
+  'Getting Started',
+  'Advanced Techniques',
+  'Quantum Computing',
+  'Research Methods',
+  'Case Studies',
+  'Reference Materials',
 ];
 
 const AdminTutorials = () => {
@@ -27,8 +38,25 @@ const AdminTutorials = () => {
   const [formData, setFormData] = useState<Partial<DocumentData>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
 
+  // Initialize documents with categories if they don't have any
+  useEffect(() => {
+    const docsNeedUpdate = documents.some(doc => !doc.category);
+    
+    if (docsNeedUpdate) {
+      const updatedDocs = documents.map(doc => ({
+        ...doc,
+        category: doc.category || CATEGORIES[0]
+      }));
+      
+      setDocuments(updatedDocs);
+    }
+  }, [documents, setDocuments]);
+
   const handleAddDocument = () => {
-    setFormData({ fileType: 'pdf' });
+    setFormData({ 
+      fileType: 'pdf',
+      category: CATEGORIES[0]
+    });
     setEditingId(null);
     setIsDialogOpen(true);
   };
@@ -135,6 +163,25 @@ const AdminTutorials = () => {
                 onChange={handleInputChange}
                 required
               />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="category">Category</Label>
+              <Select
+                value={formData.category}
+                onValueChange={(value) => handleSelectChange('category', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORIES.map((category) => (
+                    <SelectItem key={category} value={category}>
+                      {category}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             
             <div className="space-y-2">
