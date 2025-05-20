@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { VideoData } from '@/components/videos/VideoCard';
 import { DocumentData } from '@/components/tutorials/DocumentCard';
@@ -76,16 +77,47 @@ export const SharedDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     fetchAllData();
 
+    // Setup periodic data refresh to check for updates from other devices
+    const refreshInterval = setInterval(async () => {
+      try {
+        // Check for updated data in IndexedDB/cloud storage
+        const videosData = await loadData('adminVideos');
+        if (videosData && videosData.length > 0 && JSON.stringify(videosData) !== JSON.stringify(videos)) {
+          setVideosState(videosData);
+        }
+        
+        const documentsData = await loadData('adminDocuments');
+        if (documentsData && documentsData.length > 0 && JSON.stringify(documentsData) !== JSON.stringify(documents)) {
+          setDocumentsState(documentsData);
+        }
+        
+        const patentsData = await loadData('adminPatents');
+        if (patentsData && patentsData.length > 0 && JSON.stringify(patentsData) !== JSON.stringify(patents)) {
+          setPatentsState(patentsData);
+        }
+        
+        const updatesData = await loadData('recentUpdates');
+        if (updatesData && updatesData.length > 0 && JSON.stringify(updatesData) !== JSON.stringify(recentUpdates)) {
+          setRecentUpdates(updatesData);
+        }
+      } catch (error) {
+        console.error("Error refreshing data:", error);
+      }
+    }, 30000); // Check every 30 seconds
+    
     // Listen for storage events from other tabs/windows
     const handleStorageEvent = (event: StorageEvent | CustomEvent) => {
       if (event instanceof StorageEvent) {
-        if (event.key === 'adminVideos' || event.key?.startsWith('cloud_adminVideos')) {
+        const keyCheck = (eventKey: string | null, dataKey: string) => 
+          eventKey === dataKey || eventKey === `cloud_${dataKey}`;
+        
+        if (event.key && keyCheck(event.key, 'adminVideos')) {
           loadData('adminVideos', []).then(setVideosState);
-        } else if (event.key === 'adminDocuments' || event.key?.startsWith('cloud_adminDocuments')) {
+        } else if (event.key && keyCheck(event.key, 'adminDocuments')) {
           loadData('adminDocuments', []).then(setDocumentsState);
-        } else if (event.key === 'adminPatents' || event.key?.startsWith('cloud_adminPatents')) {
+        } else if (event.key && keyCheck(event.key, 'adminPatents')) {
           loadData('adminPatents', []).then(setPatentsState);
-        } else if (event.key === 'recentUpdates' || event.key?.startsWith('cloud_recentUpdates')) {
+        } else if (event.key && keyCheck(event.key, 'recentUpdates')) {
           loadData('recentUpdates', []).then(setRecentUpdates);
         }
       } else if (event instanceof CustomEvent && event.type === 'lovableStorage') {
@@ -106,10 +138,11 @@ export const SharedDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     window.addEventListener('lovableStorage', handleStorageEvent as EventListener);
     
     return () => {
+      clearInterval(refreshInterval);
       window.removeEventListener('storage', handleStorageEvent);
       window.removeEventListener('lovableStorage', handleStorageEvent as EventListener);
     };
-  }, []);
+  }, [videos, documents, patents, recentUpdates]);
 
   const setVideos = (newVideos: VideoData[]) => {
     setVideosState(newVideos);

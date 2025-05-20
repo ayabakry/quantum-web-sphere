@@ -1,8 +1,9 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useSharedData } from '@/context/SharedDataContext';
 import { Skeleton } from '@/components/ui/skeleton';
+import { loadData } from '@/lib/utils';
 
 export type Update = {
   id: number;
@@ -14,6 +15,30 @@ export type Update = {
 
 const RecentUpdates: React.FC = () => {
   const { recentUpdates, loading } = useSharedData();
+  const [displayUpdates, setDisplayUpdates] = useState<Update[]>([]);
+
+  // Try to load updates directly for faster rendering
+  useEffect(() => {
+    const loadInitialUpdates = async () => {
+      try {
+        const cachedUpdates = await loadData('recentUpdates', []);
+        if (cachedUpdates && cachedUpdates.length > 0) {
+          setDisplayUpdates(cachedUpdates);
+        }
+      } catch (error) {
+        console.error("Error loading cached updates:", error);
+      }
+    };
+    
+    loadInitialUpdates();
+  }, []);
+
+  // Update from context when available
+  useEffect(() => {
+    if (recentUpdates && recentUpdates.length > 0) {
+      setDisplayUpdates(recentUpdates);
+    }
+  }, [recentUpdates]);
 
   // Loading skeleton component
   const LoadingSkeleton = () => (
@@ -42,6 +67,8 @@ const RecentUpdates: React.FC = () => {
     </div>
   );
 
+  const showLoading = loading && displayUpdates.length === 0;
+
   return (
     <Card className="w-full h-full">
       <CardHeader>
@@ -49,11 +76,11 @@ const RecentUpdates: React.FC = () => {
         <CardDescription>Latest content added to QRAM</CardDescription>
       </CardHeader>
       <CardContent>
-        {loading ? (
+        {showLoading ? (
           <LoadingSkeleton />
         ) : (
           <div className="space-y-4">
-            {recentUpdates.map((update) => (
+            {displayUpdates.map((update) => (
               <div key={update.id} className="flex items-start space-x-4 pb-4 border-b last:border-0">
                 <div className="w-full">
                   <div className="flex justify-between">
@@ -72,7 +99,7 @@ const RecentUpdates: React.FC = () => {
                 </div>
               </div>
             ))}
-            {recentUpdates.length === 0 && (
+            {displayUpdates.length === 0 && (
               <p className="text-center text-muted-foreground py-8">No recent updates</p>
             )}
           </div>

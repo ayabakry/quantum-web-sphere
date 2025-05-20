@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { getYoutubeThumbnail } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -21,8 +21,21 @@ interface VideoCardProps {
 const VideoCard: React.FC<VideoCardProps> = ({ video, onSelect }) => {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [thumbnailUrl, setThumbnailUrl] = useState('');
   
-  const thumbnailUrl = video.thumbnail || getYoutubeThumbnail(video.id);
+  // Get or generate thumbnail URL
+  useEffect(() => {
+    const generateThumbnail = async () => {
+      if (video.thumbnail) {
+        setThumbnailUrl(video.thumbnail);
+      } else {
+        const generatedUrl = getYoutubeThumbnail(video.id);
+        setThumbnailUrl(generatedUrl);
+      }
+    };
+    
+    generateThumbnail();
+  }, [video]);
   
   const handleImageLoad = () => {
     setImageLoaded(true);
@@ -37,6 +50,10 @@ const VideoCard: React.FC<VideoCardProps> = ({ video, onSelect }) => {
       img.onload = () => {
         setImageError(false);
         setImageLoaded(true);
+        setThumbnailUrl(fallbackThumbnail);
+      };
+      img.onerror = () => {
+        setImageError(true);
       };
       img.src = fallbackThumbnail;
     }
@@ -52,13 +69,15 @@ const VideoCard: React.FC<VideoCardProps> = ({ video, onSelect }) => {
           <Skeleton className="absolute inset-0" />
         )}
         
-        <img 
-          src={thumbnailUrl} 
-          alt={video.title}
-          className={`object-cover w-full h-full transition-transform hover:scale-105 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
-          onLoad={handleImageLoad}
-          onError={handleImageError}
-        />
+        {thumbnailUrl && (
+          <img 
+            src={thumbnailUrl} 
+            alt={video.title}
+            className={`object-cover w-full h-full transition-transform hover:scale-105 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+            onLoad={handleImageLoad}
+            onError={handleImageError}
+          />
+        )}
         
         {imageError && (
           <div className="flex items-center justify-center h-full bg-gray-100">
