@@ -24,11 +24,9 @@ const Index = () => {
             </div>
             <div className="flex flex-wrap items-center justify-center gap-4">
               <Button asChild size="lg">
-                <Link to="/videos">Explore Videos</Link>
+                <Link to="https://q1ram-demo.streamlit.app/" target='_blank'>Upload File</Link>
               </Button>
-              <Button asChild variant="outline" size="lg">
-                <Link to="/tutorials">View Tutorials</Link>
-              </Button>
+             
             </div>
           </div>
         </div>
