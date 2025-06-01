@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
+import { SharedDataProvider } from "./context/SharedDataContext";
 import ProtectedRoute from "./components/admin/ProtectedRoute";
 
 import Index from "./pages/Index";
@@ -28,47 +29,49 @@ const App = () => (
     <TooltipProvider>
       <BrowserRouter>
         <AuthProvider>
-          <Toaster />
-          <Sonner />
-          <Routes>
-            {/* Main Routes */}
-            <Route path="/" element={<Index />} />
-            <Route path="/videos" element={<Videos />} />
-            <Route path="/tutorials" element={<Tutorials />} />
-            <Route path="/patents" element={<Patents />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="/login" element={<Login />} />
-            
-            {/* Protected Admin Routes */}
-            <Route path="/admin" element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/videos" element={
-              <ProtectedRoute>
-                <AdminVideos />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/tutorials" element={
-              <ProtectedRoute>
-                <AdminTutorials />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/patents" element={
-              <ProtectedRoute>
-                <AdminPatents />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/settings" element={
-              <ProtectedRoute>
-                <AdminSettings />
-              </ProtectedRoute>
-            } />
-            
-            {/* 404 Route */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <SharedDataProvider>
+            <Toaster />
+            <Sonner />
+            <Routes>
+              {/* Main Routes */}
+              <Route path="/" element={<Index />} />
+              <Route path="/videos" element={<Videos />} />
+              <Route path="/tutorials" element={<Tutorials />} />
+              <Route path="/patents" element={<Patents />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/login" element={<Login />} />
+              
+              {/* Protected Admin Routes */}
+              <Route path="/admin" element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/videos" element={
+                <ProtectedRoute>
+                  <AdminVideos />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/tutorials" element={
+                <ProtectedRoute>
+                  <AdminTutorials />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/patents" element={
+                <ProtectedRoute>
+                  <AdminPatents />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/settings" element={
+                <ProtectedRoute>
+                  <AdminSettings />
+                </ProtectedRoute>
+              } />
+              
+              {/* 404 Route */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </SharedDataProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

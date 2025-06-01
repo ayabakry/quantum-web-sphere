@@ -1,16 +1,20 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { getYoutubeThumbnail, syncData } from '@/lib/utils';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
+import { Play, Clock, Lock } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 
 export interface VideoData {
   id: string;
   title: string;
-  thumbnail?: string;
-  channelName: string;
-  publishedAt: string;
   description: string;
+  thumbnailUrl: string;
+  videoUrl: string;
+  duration: string;
+  uploadedAt: string;
+  channelName: string;
+  isPremium?: boolean;
 }
 
 interface VideoCardProps {
@@ -19,105 +23,59 @@ interface VideoCardProps {
 }
 
 const VideoCard: React.FC<VideoCardProps> = ({ video, onSelect }) => {
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const [imageError, setImageError] = useState(false);
-  const [thumbnailUrl, setThumbnailUrl] = useState('');
+  const { isPremium } = useAuth();
   
-  // Get or generate thumbnail URL
-  useEffect(() => {
-    const generateThumbnail = async () => {
-      if (video.thumbnail) {
-        setThumbnailUrl(video.thumbnail);
-      } else {
-        const generatedUrl = getYoutubeThumbnail(video.id);
-        setThumbnailUrl(generatedUrl);
-        
-        // Cache the thumbnail for better performance
-        if (generatedUrl) {
-          try {
-            // Create an updated video object with the thumbnail
-            const updatedVideo = { ...video, thumbnail: generatedUrl };
-            
-            // Look for this video in the existing data
-            const videosCacheString = localStorage.getItem('adminVideos');
-            if (videosCacheString) {
-              try {
-                const videosCache = JSON.parse(videosCacheString);
-                const updatedVideos = videosCache.map((v: VideoData) => 
-                  v.id === video.id ? updatedVideo : v
-                );
-                
-                // Save using the improved syncData function
-                syncData('adminVideos', updatedVideos).catch(console.error);
-              } catch (parseError) {
-                console.error("Error parsing videos cache:", parseError);
-              }
-            }
-          } catch (error) {
-            console.error("Error caching thumbnail:", error);
-          }
-        }
-      }
-    };
-    
-    generateThumbnail();
-  }, [video]);
-  
-  const handleImageLoad = () => {
-    setImageLoaded(true);
-  };
-  
-  const handleImageError = () => {
-    setImageError(true);
-    // If primary thumbnail fails, try direct YouTube API
-    const fallbackThumbnail = getYoutubeThumbnail(video.id);
-    if (thumbnailUrl !== fallbackThumbnail) {
-      const img = new Image();
-      img.onload = () => {
-        setImageError(false);
-        setImageLoaded(true);
-        setThumbnailUrl(fallbackThumbnail);
-      };
-      img.onerror = () => {
-        setImageError(true);
-      };
-      img.src = fallbackThumbnail;
+  const canAccess = !video.isPremium || isPremium;
+
+  const handleClick = () => {
+    if (canAccess) {
+      onSelect(video);
     }
   };
 
   return (
     <Card 
-      className="overflow-hidden cursor-pointer transition-all hover:shadow-md"
-      onClick={() => onSelect(video)}
+      className={`cursor-pointer transition-all hover:shadow-md relative ${
+        !canAccess ? 'opacity-75' : ''
+      }`}
+      onClick={handleClick}
     >
-      <div className="aspect-video relative overflow-hidden">
-        {!imageLoaded && !imageError && (
-          <Skeleton className="absolute inset-0" />
-        )}
-        
-        {thumbnailUrl && (
-          <img 
-            src={thumbnailUrl} 
-            alt={video.title}
-            className={`object-cover w-full h-full transition-transform hover:scale-105 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
-            onLoad={handleImageLoad}
-            onError={handleImageError}
-          />
-        )}
-        
-        {imageError && (
-          <div className="flex items-center justify-center h-full bg-gray-100">
-            <p className="text-sm text-gray-500">Thumbnail unavailable</p>
-          </div>
-        )}
-        
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 hover:opacity-100 transition-opacity flex items-end p-2">
-          <span className="text-white text-sm font-medium">Watch Now</span>
+      {video.isPremium && (
+        <Badge className="absolute top-2 right-2 bg-yellow-500 text-yellow-50 z-10">
+          Premium
+        </Badge>
+      )}
+      
+      <div className="relative">
+        <img
+          src={video.thumbnailUrl}
+          alt={video.title}
+          className="w-full h-32 object-cover rounded-t-lg"
+        />
+        <div className="absolute inset-0 flex items-center justify-center">
+          {canAccess ? (
+            <div className="bg-black/50 rounded-full p-3">
+              <Play className="h-6 w-6 text-white" fill="white" />
+            </div>
+          ) : (
+            <div className="bg-black/50 rounded-full p-3">
+              <Lock className="h-6 w-6 text-white" />
+            </div>
+          )}
+        </div>
+        <div className="absolute bottom-2 right-2 bg-black/75 text-white text-xs px-2 py-1 rounded">
+          <Clock className="h-3 w-3 inline mr-1" />
+          {video.duration}
         </div>
       </div>
+      
       <CardContent className="p-3">
-        <h3 className="font-medium line-clamp-2 text-sm mb-1">{video.title}</h3>
-        <p className="text-xs text-muted-foreground">{video.channelName}</p>
+        <h3 className="font-medium text-sm line-clamp-2 mb-1">{video.title}</h3>
+        <p className="text-xs text-muted-foreground mb-2">{video.channelName}</p>
+        <p className="text-xs text-muted-foreground">{video.uploadedAt}</p>
+        {video.isPremium && !isPremium && (
+          <p className="text-xs text-yellow-600 mt-1">Premium required</p>
+        )}
       </CardContent>
     </Card>
   );

@@ -5,9 +5,14 @@ import QuantumVisualizer from '@/components/home/QuantumVisualizer';
 import RecentUpdates from '@/components/home/RecentUpdates';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { Video, FileText, Database } from 'lucide-react';
+import { Video, FileText, Database, Lock } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 
 const Index = () => {
+  const { isAuthenticated, hasAcceptedTerms } = useAuth();
+  
+  const canAccessUpload = isAuthenticated && hasAcceptedTerms;
+
   return (
     <MainLayout>
       {/* Hero Section */}
@@ -23,18 +28,23 @@ const Index = () => {
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-4">
-              <Button asChild size="lg">
-                <Link to="https://q1ram-demo.streamlit.app/" target='_blank'>Upload File</Link>
-              </Button>
-             
+              {canAccessUpload ? (
+                <Button asChild size="lg">
+                  <Link to="https://q1ram-demo.streamlit.app/" target='_blank'>Upload File</Link>
+                </Button>
+              ) : (
+                <Button asChild size="lg" variant="outline">
+                  <Link to="/login">
+                    <Lock className="mr-2 h-4 w-4" />
+                    Login to Upload
+                  </Link>
+                </Button>
+              )}
             </div>
           </div>
         </div>
       </section>
 
-     
-
-    
       {/* Features */}
       <section className="py-12 md:py-16">
         <div className="container px-4 md:px-6">
