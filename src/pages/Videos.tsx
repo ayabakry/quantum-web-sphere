@@ -1,4 +1,5 @@
-import React from 'react';
+
+import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/layouts/MainLayout';
 import ProtectedContent from '@/components/auth/ProtectedContent';
 import VideoCard, { VideoData } from '@/components/videos/VideoCard';
