@@ -6,11 +6,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { loadData } from '@/lib/utils';
 
 export type Update = {
-  id: number;
+  id: string;
   title: string;
   description: string;
   date: string;
-  type: 'video' | 'tutorial' | 'patent';
+  type: 'video' | 'document' | 'patent';
 };
 
 const RecentUpdates: React.FC = () => {
@@ -39,11 +39,18 @@ const RecentUpdates: React.FC = () => {
     loadInitialUpdates();
   }, []);
 
-  // Update from context when available
+  // Update from context when available - convert RecentUpdate to Update format
   useEffect(() => {
     if (recentUpdates && recentUpdates.length > 0) {
       console.log('Update from context received:', recentUpdates);
-      setDisplayUpdates(recentUpdates);
+      const convertedUpdates: Update[] = recentUpdates.map(update => ({
+        id: update.id,
+        title: update.title,
+        description: `Latest ${update.type} content`,
+        date: update.date,
+        type: update.type
+      }));
+      setDisplayUpdates(convertedUpdates);
     }
   }, [recentUpdates]);
 
@@ -95,7 +102,7 @@ const RecentUpdates: React.FC = () => {
                     <div className={`
                       inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold
                       ${update.type === 'video' ? 'bg-red-100 text-red-800' : ''}
-                      ${update.type === 'tutorial' ? 'bg-blue-100 text-blue-800' : ''}
+                      ${update.type === 'document' ? 'bg-blue-100 text-blue-800' : ''}
                       ${update.type === 'patent' ? 'bg-green-100 text-green-800' : ''}
                     `}>
                       {update.type}

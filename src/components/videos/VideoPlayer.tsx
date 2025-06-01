@@ -53,7 +53,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
     <Card className="w-full">
       <CardHeader>
         <CardTitle>{video.title}</CardTitle>
-        <CardDescription>{video.channelName} • {video.publishedAt}</CardDescription>
+        <CardDescription>{video.channelName} • {video.uploadedAt}</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="aspect-video rounded-md overflow-hidden">
