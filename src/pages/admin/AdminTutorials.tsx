@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/components/ui/use-toast';
 import { Plus } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -17,11 +18,11 @@ const columns = [
   { key: 'title', label: 'Title' },
   { key: 'category', label: 'Category' },
   { key: 'fileType', label: 'File Type' },
+  { key: 'isPremium', label: 'Premium' },
   { key: 'uploadedAt', label: 'Upload Date' },
   { key: 'fileSize', label: 'File Size' },
 ];
 
-// Predefined categories
 const CATEGORIES = [
   'Getting Started',
   'Advanced Techniques',
@@ -38,14 +39,14 @@ const AdminTutorials = () => {
   const [formData, setFormData] = useState<Partial<DocumentData>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // Initialize documents with categories if they don't have any
   useEffect(() => {
     const docsNeedUpdate = documents.some(doc => !doc.category);
     
     if (docsNeedUpdate) {
       const updatedDocs = documents.map(doc => ({
         ...doc,
-        category: doc.category || CATEGORIES[0]
+        category: doc.category || CATEGORIES[0],
+        isPremium: doc.isPremium || false
       }));
       
       setDocuments(updatedDocs);
@@ -55,7 +56,8 @@ const AdminTutorials = () => {
   const handleAddDocument = () => {
     setFormData({ 
       fileType: 'pdf',
-      category: CATEGORIES[0]
+      category: CATEGORIES[0],
+      isPremium: false
     });
     setEditingId(null);
     setIsDialogOpen(true);
@@ -85,7 +87,6 @@ const AdminTutorials = () => {
     e.preventDefault();
     
     if (editingId) {
-      // Update existing document
       const updatedDocuments = documents.map(d => 
         d.id === editingId ? { ...d, ...formData } as DocumentData : d
       );
@@ -97,7 +98,6 @@ const AdminTutorials = () => {
         description: "The document has been updated successfully",
       });
     } else {
-      // Add new document
       const newDocument = {
         ...formData,
         id: String(Date.now()),
@@ -125,6 +125,10 @@ const AdminTutorials = () => {
     setFormData({ ...formData, [name]: value });
   };
 
+  const handleCheckboxChange = (checked: boolean) => {
+    setFormData({ ...formData, isPremium: checked });
+  };
+
   return (
     <AdminLayout>
       <div className="flex items-center justify-between mb-8">
@@ -136,7 +140,10 @@ const AdminTutorials = () => {
       
       <ContentTable
         columns={columns}
-        data={documents}
+        data={documents.map(doc => ({
+          ...doc,
+          isPremium: doc.isPremium ? 'Yes' : 'No'
+        }))}
         onEdit={handleEditDocument}
         onDelete={handleDeleteDocument}
       />
@@ -196,8 +203,18 @@ const AdminTutorials = () => {
                 <SelectContent>
                   <SelectItem value="pdf">PDF</SelectItem>
                   <SelectItem value="ppt">PPT</SelectItem>
+                  <SelectItem value="zip">ZIP</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="isPremium"
+                checked={formData.isPremium || false}
+                onCheckedChange={handleCheckboxChange}
+              />
+              <Label htmlFor="isPremium">Premium Content</Label>
             </div>
             
             <div className="space-y-2">

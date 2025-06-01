@@ -14,7 +14,6 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { login, user } = useAuth();
 
-  // If already logged in, redirect based on role
   if (user) {
     return <Navigate to={user.role === 'admin' ? '/admin' : '/'} />;
   }
@@ -62,7 +61,8 @@ const Login = () => {
               <div className="text-sm text-muted-foreground">
                 <p>Demo credentials:</p>
                 <p>Admin: admin / admin123</p>
-                <p>User: user / user123</p>
+                <p>Free User: user / user123</p>
+                <p>Premium User: premium / premium123</p>
               </div>
             </CardContent>
             <CardFooter>

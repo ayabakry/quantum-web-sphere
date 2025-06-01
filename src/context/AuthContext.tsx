@@ -7,13 +7,19 @@ interface User {
   id: string;
   username: string;
   role: 'admin' | 'user';
+  hasAcceptedTerms: boolean;
+  subscription: 'free' | 'premium';
 }
 
 interface AuthContextType {
   user: User | null;
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
+  acceptTerms: () => void;
   isAdmin: boolean;
+  isAuthenticated: boolean;
+  hasAcceptedTerms: boolean;
+  isPremium: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,15 +38,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const login = async (username: string, password: string): Promise<boolean> => {
-    // This is a mock login function
-    // In a real app, you would validate against an API
-    
     // Mock credentials for demo purposes
     if (username === 'admin' && password === 'admin123') {
       const adminUser = {
         id: '1',
         username: 'admin',
-        role: 'admin' as const
+        role: 'admin' as const,
+        hasAcceptedTerms: false,
+        subscription: 'premium' as const
       };
       
       setUser(adminUser);
@@ -58,7 +63,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const regularUser = {
         id: '2',
         username: 'user',
-        role: 'user' as const
+        role: 'user' as const,
+        hasAcceptedTerms: false,
+        subscription: 'free' as const
       };
       
       setUser(regularUser);
@@ -72,6 +79,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       navigate('/');
       return true;
     }
+    else if (username === 'premium' && password === 'premium123') {
+      const premiumUser = {
+        id: '3',
+        username: 'premium',
+        role: 'user' as const,
+        hasAcceptedTerms: false,
+        subscription: 'premium' as const
+      };
+      
+      setUser(premiumUser);
+      localStorage.setItem('user', JSON.stringify(premiumUser));
+      
+      toast({
+        title: 'Welcome Premium User',
+        description: 'You have successfully logged in with premium access',
+      });
+      
+      navigate('/');
+      return true;
+    }
     
     toast({
       title: 'Login Failed',
@@ -79,6 +106,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       variant: 'destructive',
     });
     return false;
+  };
+
+  const acceptTerms = () => {
+    if (user) {
+      const updatedUser = { ...user, hasAcceptedTerms: true };
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      
+      toast({
+        title: 'Terms Accepted',
+        description: 'You can now access all features',
+      });
+    }
   };
 
   const logout = () => {
@@ -95,7 +135,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     user,
     login,
     logout,
-    isAdmin: user?.role === 'admin'
+    acceptTerms,
+    isAdmin: user?.role === 'admin',
+    isAuthenticated: !!user,
+    hasAcceptedTerms: user?.hasAcceptedTerms || false,
+    isPremium: user?.subscription === 'premium'
   };
 
   return (
