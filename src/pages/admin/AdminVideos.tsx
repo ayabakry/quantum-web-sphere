@@ -11,13 +11,54 @@ import { useToast } from '@/components/ui/use-toast';
 import { Plus } from 'lucide-react';
 import { VideoData } from '@/components/videos/VideoCard';
 import { useSharedData } from '@/context/SharedDataContext';
-import { getYoutubeThumbnail } from '@/lib/utils';
 
 const columns = [
   { key: 'title', label: 'Title' },
   { key: 'channelName', label: 'Channel' },
-  { key: 'publishedAt', label: 'Published Date' },
+  { key: 'uploadedAt', label: 'Published Date' },
 ];
+
+// Improved YouTube thumbnail generation
+const getYoutubeThumbnail = (url: string): string => {
+  console.log('Generating thumbnail for:', url);
+  
+  // Extract video ID using the same logic as VideoPlayer
+  const getVideoId = (url: string) => {
+    if (url && url.length === 11 && !url.includes('http') && !url.includes('.')) {
+      return url;
+    }
+
+    try {
+      const urlObj = new URL(url);
+      if (urlObj.hostname === 'youtu.be') {
+        return urlObj.pathname.substring(1).split('?')[0];
+      } 
+      if (urlObj.hostname.includes('youtube.com')) {
+        const searchParams = new URLSearchParams(urlObj.search);
+        return searchParams.get('v');
+      }
+    } catch (error) {
+      if (url.includes('youtu.be/')) {
+        return url.split('youtu.be/')[1].split('?')[0].split('&')[0];
+      } 
+      if (url.includes('youtube.com/watch?v=')) {
+        return url.split('v=')[1].split('&')[0];
+      }
+    }
+    
+    return url;
+  };
+
+  const videoId = getVideoId(url);
+  if (videoId) {
+    const thumbnail = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+    console.log('Generated thumbnail:', thumbnail);
+    return thumbnail;
+  }
+  
+  console.log('Could not generate thumbnail, using placeholder');
+  return '/placeholder.svg';
+};
 
 const AdminVideos = () => {
   const { toast } = useToast();
@@ -64,8 +105,10 @@ const AdminVideos = () => {
       return;
     }
     
-    // Automatically generate thumbnail from YouTube URL
-    const thumbnail = getYoutubeThumbnail(formData.id);
+    console.log('Form submitted with data:', formData);
+    
+    // Generate thumbnail from YouTube URL
+    const thumbnailUrl = getYoutubeThumbnail(formData.id);
     
     if (editingId) {
       // Update existing video
@@ -73,7 +116,7 @@ const AdminVideos = () => {
         v.id === editingId ? { 
           ...v, 
           ...formData,
-          thumbnail 
+          thumbnailUrl 
         } as VideoData : v
       );
       setVideos(updatedVideos);
@@ -88,10 +131,12 @@ const AdminVideos = () => {
       const newVideo = {
         ...formData,
         id: formData.id,
-        thumbnail,
-        publishedAt: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+        thumbnailUrl,
+        videoUrl: formData.id, // Store the original URL as videoUrl too
+        uploadedAt: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
       } as VideoData;
       
+      console.log('Adding new video:', newVideo);
       setVideos([...videos, newVideo]);
       updateRecentUpdates();
       
@@ -156,11 +201,11 @@ const AdminVideos = () => {
                 name="id"
                 value={formData.id || ''}
                 onChange={handleInputChange}
-                placeholder="https://www.youtube.com/watch?v=..."
+                placeholder="https://www.youtube.com/watch?v=dQw4w9WgXcQ or dQw4w9WgXcQ"
                 required
               />
               <p className="text-xs text-muted-foreground">
-                Thumbnails will be automatically generated from this YouTube URL
+                Enter a full YouTube URL or just the video ID. Thumbnails will be automatically generated.
               </p>
             </div>
             

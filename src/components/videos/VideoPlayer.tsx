@@ -24,30 +24,73 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
     );
   }
 
-  // Extract YouTube video ID from URL
+  // Improved YouTube video ID extraction with better error handling
   const getVideoId = (url: string) => {
+    console.log('Extracting video ID from:', url);
+    
+    // If it's already a video ID (11 characters), return it
+    if (url && url.length === 11 && !url.includes('http') && !url.includes('.')) {
+      console.log('Already a video ID:', url);
+      return url;
+    }
+
     try {
       const urlObj = new URL(url);
       
+      // Handle youtu.be URLs
       if (urlObj.hostname === 'youtu.be') {
-        return urlObj.pathname.substring(1);
-      } else if (urlObj.hostname.includes('youtube.com')) {
+        const id = urlObj.pathname.substring(1).split('?')[0];
+        console.log('Extracted from youtu.be:', id);
+        return id;
+      } 
+      
+      // Handle youtube.com URLs
+      if (urlObj.hostname.includes('youtube.com')) {
         const searchParams = new URLSearchParams(urlObj.search);
-        return searchParams.get('v');
+        const id = searchParams.get('v');
+        console.log('Extracted from youtube.com:', id);
+        return id;
       }
     } catch (error) {
-      // If URL parsing fails, try simple string extraction
+      console.log('URL parsing failed, trying string extraction:', error);
+      
+      // Fallback: try simple string extraction
       if (url.includes('youtu.be/')) {
-        return url.split('youtu.be/')[1].split('?')[0];
-      } else if (url.includes('youtube.com/watch?v=')) {
-        return url.split('v=')[1].split('&')[0];
+        const id = url.split('youtu.be/')[1].split('?')[0].split('&')[0];
+        console.log('Extracted with string method from youtu.be:', id);
+        return id;
+      } 
+      
+      if (url.includes('youtube.com/watch?v=')) {
+        const id = url.split('v=')[1].split('&')[0];
+        console.log('Extracted with string method from youtube.com:', id);
+        return id;
       }
     }
     
-    return url; // Assume it's already an ID
+    console.log('No extraction method worked, returning original:', url);
+    return url; // Return original if nothing works
   };
 
   const videoId = getVideoId(video.id);
+  console.log('Final video ID for embedding:', videoId);
+
+  // Don't render if we don't have a valid video ID
+  if (!videoId) {
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>{video.title}</CardTitle>
+          <CardDescription>{video.channelName} • {video.uploadedAt}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="aspect-video bg-muted/50 flex items-center justify-center rounded-md">
+            <p className="text-muted-foreground">Invalid video URL</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="w-full">
